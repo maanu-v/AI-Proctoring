@@ -50,6 +50,13 @@
                     </label>
                 </div>
                 <div class="toggle-item">
+                    <span class="toggle-label">Face Mesh</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-face-mesh" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-item">
                     <span class="toggle-label">Allowed Persons</span>
                     <div class="counter-control">
                         <button class="counter-btn" id="person-dec">-</button>
@@ -93,6 +100,23 @@
                 console.log(`${id} changed to ${e.target.checked}`);
                 // Future: Send configuration to backend
             });
+        });
+
+        // Face Mesh Toggle (with backend integration)
+        const faceMeshToggle = document.getElementById('toggle-face-mesh');
+        faceMeshToggle.addEventListener('change', async (e) => {
+            const enabled = e.target.checked;
+            console.log(`Face mesh ${enabled ? 'enabled' : 'disabled'}`);
+            
+            try {
+                const response = await fetch(`/toggle_face_mesh?enabled=${enabled}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                console.log('Face mesh status:', data);
+            } catch (error) {
+                console.error('Error toggling face mesh:', error);
+            }
         });
 
         // Person Counter

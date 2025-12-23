@@ -1,0 +1,23 @@
+face_mesh:
+  static_image_mode: false
+  max_num_faces: 1
+  refine_landmarks: true # Enable iris landmarks
+  min_detection_confidence: 0.5
+  min_tracking_confidence: 0.5
+
+gaze:
+  enabled: true
+  smoothing_window: 5
+
+head_pose:
+  enabled: true
+  smoothing_window: 3
+
+mouth:
+  enabled: true
+  mar_threshold: 0.6 # Mouth Aspect Ratio threshold for open mouth
+
+person_detection:
+  enabled: true
+  max_persons: 1
+  confidence_threshold: 0.5
