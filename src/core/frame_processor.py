@@ -1,16 +1,15 @@
 import cv2
-import time
+from src.core.video_stream import VideoStream
 
 class FrameProcessor:
-    def __init__(self, camera_id=0):
-        self.camera_id = camera_id
-        self.camera = cv2.VideoCapture(self.camera_id)
-        if not self.camera.isOpened():
-            raise RuntimeError(f"Could not start camera with id {self.camera_id}")
+    def __init__(self, camera_id=None):
+        # Initialize VideoStream (Singleton)
+        self.video_stream = VideoStream(source=camera_id)
+        self.video_stream.start()
 
     def get_frame(self):
-        success, frame = self.camera.read()
-        if not success:
+        frame = self.video_stream.read()
+        if frame is None:
             return None
         
         # Encode frame to JPEG
@@ -21,5 +20,5 @@ class FrameProcessor:
         return buffer.tobytes()
 
     def __del__(self):
-        if self.camera.isOpened():
-            self.camera.release()
+        # VideoStream handles its own cleanup via its own __del__ or explicit stop
+        pass

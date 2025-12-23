@@ -130,6 +130,11 @@
             startBtn.disabled = false;
             stopBtn.disabled = true;
         });
+
+        // Auto-load video feed on page load
+        window.addEventListener('load', () => {
+            videoFeed.src = "/video_feed?" + new Date().getTime();
+        });
     </script>
 </body>
 </html>

@@ -1,0 +1,18 @@
+app:
+  name: "AI Proctor"
+  version: "1.0.0"
+  debug: true
+  host: "0.0.0.0"
+  port: 8000
+
+camera:
+  source: 0 # 0 for default webcam, or path to video file
+  width: 1280
+  height: 720
+  fps: 30
+
+logging:
+  level: "INFO"
+  use_rich: true
+  rich_format: "%(message)s"
+  standard_format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

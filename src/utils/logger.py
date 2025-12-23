@@ -127,4 +127,5 @@ if config.USE_RICH_LOGGING:
     )
 
 # Global logger instance
-logger: Logger = Logger(name='core.logger', log_level=config.LOG_LEVEL, log_format=config.RICH_LOG_FORMAT if config.USE_RICH_LOGGING else config.LOG_FORMAT)
+_logger_wrapper = Logger(name='core.logger', log_level=config.LOG_LEVEL, log_format=config.RICH_LOG_FORMAT if config.USE_RICH_LOGGING else config.LOG_FORMAT)
+logger = _logger_wrapper.get_logger()
