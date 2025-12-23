@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Proctoring Dashboard</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <!-- Using Inter font for premium look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <header>
+                <h1>AI Proctor</h1>
+                <h2>Control Panel</h2>
+            </header>
+
+            <h3>Analysis Modules</h3>
+            <div class="control-group">
+                <div class="toggle-item">
+                    <span class="toggle-label">Gaze Tracking</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-gaze" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-item">
+                    <span class="toggle-label">Face Movement</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-face-move" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-item">
+                    <span class="toggle-label">Face Detection</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-face-detect" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-item">
+                    <span class="toggle-label">Mouth Activity</span>
+                    <label class="switch">
+                        <input type="checkbox" id="toggle-mouth">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-item">
+                    <span class="toggle-label">Allowed Persons</span>
+                    <div class="counter-control">
+                        <button class="counter-btn" id="person-dec">-</button>
+                        <span class="counter-value" id="person-count">1</span>
+                        <button class="counter-btn" id="person-inc">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button id="start-btn">Start Session</button>
+                <button id="stop-btn" class="secondary">End Session</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="video-wrapper">
+                <img src="/video_feed" alt="Live Video Feed" id="video-feed">
+                <div class="overlay">
+                    <span class="status-badge">LIVE</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const videoFeed = document.getElementById('video-feed');
+
+        // Toggles
+        const toggles = [
+            'toggle-gaze', 'toggle-face-move', 'toggle-face-detect', 
+            'toggle-mouth'
+        ];
+
+        toggles.forEach(id => {
+            const toggle = document.getElementById(id);
+            toggle.addEventListener('change', (e) => {
+                console.log(`${id} changed to ${e.target.checked}`);
+                // Future: Send configuration to backend
+            });
+        });
+
+        // Person Counter
+        const personCountSpan = document.getElementById('person-count');
+        const personIncBtn = document.getElementById('person-inc');
+        const personDecBtn = document.getElementById('person-dec');
+        let personCount = 1;
+
+        personIncBtn.addEventListener('click', () => {
+            personCount++;
+            personCountSpan.textContent = personCount;
+            console.log(`Allowed persons set to ${personCount}`);
+        });
+
+        personDecBtn.addEventListener('click', () => {
+            if (personCount > 1) {
+                personCount--;
+                personCountSpan.textContent = personCount;
+                console.log(`Allowed persons set to ${personCount}`);
+            }
+        });
+
+        startBtn.addEventListener('click', () => {
+            console.log('Session started');
+            videoFeed.src = "/video_feed?" + new Date().getTime();
+            startBtn.textContent = "Session Active";
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+        });
+
+        stopBtn.addEventListener('click', () => {
+            console.log('Session ended');
+            videoFeed.src = ""; // Or placeholder
+            startBtn.textContent = "Start Session";
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+        });
+    </script>
+</body>
+</html>
