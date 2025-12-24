@@ -1,12 +1,25 @@
 import cv2
 import numpy as np
-import mediapipe as mp
-from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
+import os
+import warnings
+
+# Import warning suppression utility first
+from src.utils.suppress_warnings import SuppressStderr
+
+# Suppress MediaPipe warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['GLOG_minloglevel'] = '3'
+warnings.filterwarnings('ignore', category=UserWarning, module='mediapipe')
+
+# Import MediaPipe with stderr suppression
+with SuppressStderr():
+    import mediapipe as mp
+    from mediapipe.tasks import python
+    from mediapipe.tasks.python import vision
+
 from typing import Optional, List, Dict, Tuple
 from dataclasses import dataclass
 from src.utils.logger import logger
-import os
 
 @dataclass
 class FaceLandmarks:

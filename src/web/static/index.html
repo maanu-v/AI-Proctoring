@@ -80,6 +80,38 @@
                     <span class="status-badge">LIVE</span>
                 </div>
             </div>
+            
+            <!-- Gaze Statistics Panel -->
+            <div class="stats-panel" id="stats-panel">
+                <h3>Gaze Tracking Statistics</h3>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">Status</span>
+                        <span class="stat-value" id="stat-status">Looking at screen</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Attention</span>
+                        <span class="stat-value" id="stat-attention">100%</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Violations</span>
+                        <span class="stat-value" id="stat-violations">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Away Time</span>
+                        <span class="stat-value" id="stat-away-time">0.0s</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Session Duration</span>
+                        <span class="stat-value" id="stat-session-duration">0.0s</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Avg Violation</span>
+                        <span class="stat-value" id="stat-avg-violation">0.0s</span>
+                    </div>
+                </div>
+                <button id="reset-stats-btn" class="secondary">Reset Statistics</button>
+            </div>
         </main>
     </div>
 
@@ -139,12 +171,98 @@
             }
         });
 
+        // Gaze Tracking Toggle
+        const gazeToggle = document.getElementById('toggle-gaze');
+        gazeToggle.addEventListener('change', async (e) => {
+            const enabled = e.target.checked;
+            console.log(`Gaze tracking ${enabled ? 'enabled' : 'disabled'}`);
+            
+            try {
+                const response = await fetch(`/toggle_gaze_tracking?enabled=${enabled}`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                console.log('Gaze tracking status:', data);
+                
+                // Show/hide stats panel
+                const statsPanel = document.getElementById('stats-panel');
+                if (enabled) {
+                    statsPanel.style.display = 'block';
+                    startStatsUpdate();
+                } else {
+                    statsPanel.style.display = 'none';
+                    stopStatsUpdate();
+                }
+            } catch (error) {
+                console.error('Error toggling gaze tracking:', error);
+            }
+        });
+
+        // Statistics Update
+        let statsInterval = null;
+
+        function startStatsUpdate() {
+            if (statsInterval) return;
+            
+            statsInterval = setInterval(async () => {
+                try {
+                    const response = await fetch('/gaze_statistics');
+                    const stats = await response.json();
+                    
+                    // Update UI
+                    document.getElementById('stat-status').textContent = 
+                        stats.is_currently_looking_away ? 'Looking away' : 'Looking at screen';
+                    document.getElementById('stat-status').style.color = 
+                        stats.is_currently_looking_away ? '#ef4444' : '#10b981';
+                    
+                    document.getElementById('stat-attention').textContent = 
+                        `${stats.attention_percentage.toFixed(1)}%`;
+                    document.getElementById('stat-violations').textContent = 
+                        stats.total_violations;
+                    document.getElementById('stat-away-time').textContent = 
+                        `${stats.total_looking_away_time.toFixed(1)}s`;
+                    document.getElementById('stat-session-duration').textContent = 
+                        `${stats.session_duration.toFixed(1)}s`;
+                    document.getElementById('stat-avg-violation').textContent = 
+                        `${stats.average_violation_duration.toFixed(1)}s`;
+                } catch (error) {
+                    console.error('Error fetching statistics:', error);
+                }
+            }, 500); // Update every 500ms
+        }
+
+        function stopStatsUpdate() {
+            if (statsInterval) {
+                clearInterval(statsInterval);
+                statsInterval = null;
+            }
+        }
+
+        // Reset Statistics Button
+        const resetStatsBtn = document.getElementById('reset-stats-btn');
+        resetStatsBtn.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/reset_gaze_statistics', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                console.log('Statistics reset:', data);
+            } catch (error) {
+                console.error('Error resetting statistics:', error);
+            }
+        });
+
         startBtn.addEventListener('click', () => {
             console.log('Session started');
             videoFeed.src = "/video_feed?" + new Date().getTime();
             startBtn.textContent = "Session Active";
             startBtn.disabled = true;
             stopBtn.disabled = false;
+            
+            // Start stats update if gaze tracking is enabled
+            if (gazeToggle.checked) {
+                startStatsUpdate();
+            }
         });
 
         stopBtn.addEventListener('click', () => {
@@ -153,11 +271,19 @@
             startBtn.textContent = "Start Session";
             startBtn.disabled = false;
             stopBtn.disabled = true;
+            
+            // Stop stats update
+            stopStatsUpdate();
         });
 
         // Auto-load video feed on page load
         window.addEventListener('load', () => {
             videoFeed.src = "/video_feed?" + new Date().getTime();
+            
+            // Start stats update if gaze tracking is enabled
+            if (gazeToggle.checked) {
+                startStatsUpdate();
+            }
         });
     </script>
 </body>

@@ -1,0 +1,36 @@
+gaze:
+  # Horizontal gaze thresholds (0.0 - 1.0, where 0.5 is center)
+  horizontal_center_min: 0.35
+  horizontal_center_max: 0.65
+
+  # Vertical gaze thresholds
+  vertical_center_min: 0.35
+  vertical_center_max: 0.65
+
+  # Time thresholds (seconds)
+  violation_min_duration: 2.0 # Minimum time looking away to count as violation
+  warning_duration: 1.0 # Show warning after this duration
+
+  # Smoothing
+  smoothing_window: 5 # Number of frames to average
+
+head_pose:
+  # Head rotation thresholds (degrees)
+  pitch_min: -15 # Looking down
+  pitch_max: 15 # Looking up
+  yaw_min: -25 # Looking left
+  yaw_max: 25 # Looking right
+  roll_min: -15 # Tilting left
+  roll_max: 15 # Tilting right
+
+  violation_min_duration: 2.0
+
+mouth:
+  # Mouth aspect ratio threshold
+  mar_threshold: 0.6 # Above this = mouth open
+  speaking_min_duration: 1.0 # Minimum duration to count as speaking
+
+eye:
+  # Eye aspect ratio threshold
+  ear_threshold: 0.2 # Below this = eye closed
+  blink_max_duration: 0.3 # Maximum duration for a blink
