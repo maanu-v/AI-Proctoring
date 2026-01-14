@@ -1,0 +1,15 @@
+app:
+  name: "AI Proctor"
+  version: "0.1.0"
+  host: "0.0.0.0"
+  port: 5000
+
+logging:
+  level: "INFO"
+  use_rich: true
+
+video:
+  source: 0
+  width: 640
+  height: 480
+  fps: 30
