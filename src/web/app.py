@@ -1,14 +1,22 @@
-from flask import Flask, Response, render_template, send_from_directory
+from flask import Flask, Response, render_template, request
 import cv2
 import time
 from ..core.video_stream import VideoStream
+from ..face.landmarks import FaceMeshDetector
 from ..utils.config import config
 from ..utils.logger import logger
 
 app = Flask(__name__, static_folder='static', template_folder='static')
 
-def generate_frames():
-    """Generator that yields frames from the VideoStream."""
+# Initialize detector
+face_detector = FaceMeshDetector()
+
+def generate_frames(analyzed_mode: bool = False):
+    """
+    Generator that yields frames from the VideoStream.
+    Args:
+        analyzed_mode: If True, draws landmarks on the frame.
+    """
     video_stream = VideoStream.get_instance()
     # Subscribe to get a queue
     frame_queue = video_stream.subscribe()
@@ -19,8 +27,17 @@ def generate_frames():
             try:
                 frame = frame_queue.get(timeout=2.0)
                 
+                # Run inference
+                results = face_detector.detect(frame)
+                
+                # Draw visualization (always face count, landmarks if analyzed_mode)
+                # Note: detect() returns results, we call draw_landmarks on the frame
+                # to modify it in-place or return a new one. 
+                # Our draw_landmarks modifies in-place.
+                PROCESSED_FRAME = face_detector.draw_landmarks(frame, results, analyzed_mode=analyzed_mode)
+                
                 # Encode frame to JPEG
-                ret, buffer = cv2.imencode('.jpg', frame)
+                ret, buffer = cv2.imencode('.jpg', PROCESSED_FRAME)
                 if not ret:
                     continue
                 
@@ -29,10 +46,7 @@ def generate_frames():
                        b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
             
             except Exception as e:
-                # Timeout or other error, check if we should stop? 
-                # Actually for generator, if client disconnects, next yield might raise error
-                # or just loop. Flask handles disconnect mostly by stopping generator iteration?
-                # We'll rely on `finally` block.
+                # Timeout or other error
                 pass
                 
     except GeneratorExit:
@@ -48,7 +62,9 @@ def index():
 
 @app.route('/video_feed')
 def video_feed():
-    return Response(generate_frames(),
+    mode = request.args.get('mode', 'raw')
+    analyzed_mode = (mode == 'analyzed')
+    return Response(generate_frames(analyzed_mode=analyzed_mode),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 def main():
