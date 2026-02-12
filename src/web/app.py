@@ -81,6 +81,18 @@ def main():
         
     if start_button:
         st.session_state.is_running = True
+        
+        # Reset Violation Tracker
+        st.session_state.violation_tracker.reset()
+        
+        # Auto-Calibrate on Start if Head Pose is enabled
+        if show_head_pose:
+            st.session_state.calibration_active = True
+            st.session_state.calibration_start_time = time.time()
+            st.session_state.calibration_data = []
+            st.session_state.pose_offsets = {"pitch": 0, "yaw": 0, "roll": 0}
+            st.toast("Starting... Calibrating Head Pose (5s)", icon="⏳")
+            
         # Initialize/Re-initialize stream
         if st.session_state.video_stream is not None:
              st.session_state.video_stream.stop()
