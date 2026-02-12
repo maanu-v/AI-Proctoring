@@ -38,6 +38,10 @@ if "calibration_active" not in st.session_state:
     st.session_state.calibration_data = []
     st.session_state.pose_offsets = {"pitch": 0, "yaw": 0, "roll": 0}
 
+if "violation_tracker" not in st.session_state:
+    from src.engine.proctor import ViolationTracker
+    st.session_state.violation_tracker = ViolationTracker()
+
 @st.cache_resource
 def get_mesh_detector():
     return MeshDetector()
@@ -171,6 +175,14 @@ def main():
                                 # Get Label (using corrected values)
                                 label = pose_estimator.get_orientation_label(pitch, yaw, roll)
                                 
+                                # Check Violations
+                                warning_active = st.session_state.violation_tracker.check_head_pose(label)
+                                
+                                if warning_active:
+                                    # Overlay Warning
+                                    cv2.putText(frame, "WARNING: LOOKING AWAY!", (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 4)
+                                    cv2.rectangle(frame, (0, 0), (frame.shape[1], frame.shape[0]), (0, 0, 255), 10)
+                                
                                 # Update Stats
                                 stats_placeholder.markdown(f"""
                                 **Head Pose Analysis**:
@@ -179,7 +191,13 @@ def main():
                                 - **Pitch**: {pitch:.1f}°
                                 - **Roll**: {roll:.1f}°
                                 - **Offsets**: P={st.session_state.pose_offsets['pitch']:.1f}, Y={st.session_state.pose_offsets['yaw']:.1f}, R={st.session_state.pose_offsets['roll']:.1f}
+                                
+                                **Violations**: {st.session_state.violation_tracker.get_violation_count()}
                                 """)
+                                
+                                if warning_active:
+                                    st.error("⚠️ WARNING: FOCUS ON THE SCREEN!")
+                                    
                     else:
                         stats_placeholder.info("No face detected.")
                         
@@ -189,6 +207,13 @@ def main():
             # Display
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame_placeholder.image(frame_rgb, channels="RGB", width="stretch")
+
+        with st.sidebar.expander("Proctoring Logs", expanded=True):
+            if st.session_state.violation_tracker.get_violation_count() > 0:
+                for v in reversed(st.session_state.violation_tracker.get_logs()):
+                    st.warning(f"{time.strftime('%H:%M:%S', time.localtime(v['timestamp']))}: {v['message']}")
+            else:
+                st.info("No violations detected.")
 
     elif not st.session_state.is_running:
          frame_placeholder.info("Click 'Start' to begin.")
