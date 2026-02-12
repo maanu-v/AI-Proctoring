@@ -189,7 +189,11 @@ def main():
                                 label = pose_estimator.get_orientation_label(pitch, yaw, roll)
                                 
                                 # Check Violations
-                                warning_active = st.session_state.violation_tracker.check_head_pose(label)
+                                warning_active, just_triggered = st.session_state.violation_tracker.check_head_pose(label)
+                                
+                                if just_triggered:
+                                    last_msg = st.session_state.violation_tracker.violations[-1].message
+                                    st.toast(last_msg, icon="⚠️")
                                 
                                 if warning_active:
                                     # Overlay Warning
@@ -207,10 +211,7 @@ def main():
                                 
                                 **Violations**: {st.session_state.violation_tracker.get_violation_count()}
                                 """)
-                                
-                                if warning_active:
-                                    st.error("⚠️ WARNING: FOCUS ON THE SCREEN!")
-                                    
+
                     else:
                         stats_placeholder.info("No face detected.")
                         

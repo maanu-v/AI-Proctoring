@@ -19,13 +19,14 @@ class ViolationTracker:
         self.violations: List[ViolationEvent] = []
         self.is_warning_active: bool = False
         
-    def check_head_pose(self, direction_label: str) -> bool:
+    def check_head_pose(self, direction_label: str) -> tuple[bool, bool]:
         """
         Checks head pose direction.
-        Returns True if a warning should be active (looking away > threshold).
+        Returns (is_warning_active, just_triggered).
         """
         is_looking_away = direction_label != "Forward"
         now = time.time()
+        just_triggered = False
         
         if is_looking_away:
             if self.current_away_start is None:
@@ -37,26 +38,35 @@ class ViolationTracker:
                 if not self.is_warning_active:
                     # New violation triggered
                     self.is_warning_active = True
-                    logger.warning(f"Violation triggered: Looking {direction_label} for {elapsed:.1f}s")
-                return True
+                    just_triggered = True
+                    
+                    msg = f"WARNING - Violation triggered: {direction_label} for {elapsed:.1f}s"
+                    self.violations.append(ViolationEvent(
+                        timestamp=now,
+                        type="VIOLATION_START",
+                        duration=0.0,
+                        message=msg
+                    ))
+                    logger.warning(msg)
         else:
             # User looked back
             if self.current_away_start is not None:
                 elapsed = now - self.current_away_start
-                if elapsed > self.away_threshold:
-                    # Log the completed violation
+                if self.is_warning_active:
+                    # Violation ended
+                    msg = f"INFO - Violation ended. Duration: {elapsed:.1f}s"
                     self.violations.append(ViolationEvent(
                         timestamp=now,
-                        type="HEAD_POSE",
+                        type="VIOLATION_END",
                         duration=elapsed,
-                        message=f"Looked away for {elapsed:.1f}s"
+                        message=msg
                     ))
-                    logger.info(f"Violation ended. Duration: {elapsed:.1f}s")
+                    logger.info(msg)
                 
                 self.current_away_start = None
                 self.is_warning_active = False
                 
-        return self.is_warning_active
+        return self.is_warning_active, just_triggered
 
     def get_violation_count(self) -> int:
         return len(self.violations)
