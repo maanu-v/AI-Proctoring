@@ -1,0 +1,127 @@
+import streamlit as st
+import cv2
+import tempfile
+import time
+import sys
+import os
+from typing import Union
+
+# Add project root to path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
+from src.core.video_stream import VideoStream
+from src.engine.face.mesh_detector import MeshDetector
+from src.utils.config import config
+from src.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+st.set_page_config(page_title="AI Proctoring Dashboard", layout="wide")
+
+st.title("🎥 AI Proctoring System")
+st.sidebar.title("Settings")
+
+# Sidebar Configuration
+source_type = st.sidebar.radio("Video Source", ["Webcam", "Video File"])
+show_mesh = st.sidebar.checkbox("Show Face Mesh", value=True)
+confidence = st.sidebar.slider("Min Detection Confidence", 0.0, 1.0, 0.5)
+
+# Global variables for caching
+if "video_stream" not in st.session_state:
+    st.session_state.video_stream = None
+
+@st.cache_resource
+def get_mesh_detector():
+    return MeshDetector()
+
+def main():
+    detector = get_mesh_detector()
+    
+    # Source Selection Logic
+    source: Union[int, str] = config.camera.index
+    
+    if source_type == "Video File":
+        video_file = st.sidebar.file_uploader("Upload Video", type=['mp4', 'mov', 'avi'])
+        if video_file is not None:
+            # Save to temp file because cv2.VideoCapture needs a path
+            tfile = tempfile.NamedTemporaryFile(delete=False) 
+            tfile.write(video_file.read())
+            source = tfile.name
+        else:
+            st.info("Please upload a video file.")
+            return
+
+    # Start/Stop Controls
+    col_btn1, col_btn2 = st.sidebar.columns(2)
+    start_button = col_btn1.button("Start")
+    stop_button = col_btn2.button("Stop")
+    
+    if "is_running" not in st.session_state:
+        st.session_state.is_running = False
+        
+    if start_button:
+        st.session_state.is_running = True
+        # Initialize/Re-initialize stream
+        if st.session_state.video_stream is not None:
+             st.session_state.video_stream.stop()
+        st.session_state.video_stream = VideoStream(source=source)
+        st.session_state.video_stream.start()
+
+    if stop_button:
+        st.session_state.is_running = False
+        if st.session_state.video_stream is not None:
+            st.session_state.video_stream.stop()
+
+    # Layout
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.subheader("Video Feed")
+        frame_placeholder = st.empty()
+        
+    with col2:
+        st.subheader("Analysis")
+        stats_placeholder = st.empty()
+
+    # Processing Loop
+    if st.session_state.is_running and st.session_state.video_stream:
+        stream = st.session_state.video_stream
+        
+        while stream.is_opened():
+            ret, frame = stream.read()
+            if not ret:
+                st.warning("End of video or failed to read frame.")
+                st.session_state.is_running = False
+                stream.stop()
+                break
+                
+            # Process
+            # Mirror the frame by default
+            frame = cv2.flip(frame, 1)
+
+            if show_mesh:
+                timestamp_ms = int(time.time() * 1000)
+                try:
+                    results = detector.process(frame, timestamp_ms)
+                    frame = detector.draw_landmarks(frame, results)
+                    
+                    # Stats
+                    num_faces = len(results.face_landmarks) if results.face_landmarks else 0
+                    stats_placeholder.markdown(f"**Faces Detected:** {num_faces}")
+                except Exception as e:
+                    logger.error(f"Processing error: {e}")
+                    st.error("Error processing frame")
+
+            # Display
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame_placeholder.image(frame_rgb, channels="RGB", use_container_width=True)
+            
+            # Optional: Throttle for file playback if it's too fast?
+            # cv2.waitKey(1) equivalent not needed for webcam, but for file...
+            # Streamlit is usually the bottleneck anyway.
+
+    elif not st.session_state.is_running:
+         frame_placeholder.info("Click 'Start' to begin.")
+
+if __name__ == "__main__":
+    main()
