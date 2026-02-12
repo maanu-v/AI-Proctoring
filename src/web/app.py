@@ -31,6 +31,13 @@ confidence = st.sidebar.slider("Min Detection Confidence", 0.0, 1.0, 0.5)
 if "video_stream" not in st.session_state:
     st.session_state.video_stream = None
 
+# Calibration State
+if "calibration_active" not in st.session_state:
+    st.session_state.calibration_active = False
+    st.session_state.calibration_start_time = 0
+    st.session_state.calibration_data = []
+    st.session_state.pose_offsets = {"pitch": 0, "yaw": 0, "roll": 0}
+
 @st.cache_resource
 def get_mesh_detector():
     return MeshDetector()
@@ -56,6 +63,14 @@ def main():
     col_btn1, col_btn2 = st.sidebar.columns(2)
     start_button = col_btn1.button("Start")
     stop_button = col_btn2.button("Stop")
+    
+    # Calibration Button (Only if Head Pose is enabled)
+    if show_head_pose:
+        if st.sidebar.button("Calibrate Head Pose"):
+            st.session_state.calibration_active = True
+            st.session_state.calibration_start_time = time.time()
+            st.session_state.calibration_data = []
+            st.sidebar.info("Calibration started. Look straight at the screen for 5 seconds.")
     
     if "is_running" not in st.session_state:
         st.session_state.is_running = False
@@ -123,14 +138,38 @@ def main():
                             (pitch, yaw, roll), rvec, tvec, cam_matrix = pose_estimator.estimate(face_landmarks, frame.shape)
                             
                             if pitch is not None:
+                                # Apply Calibration Offsets
+                                pitch -= st.session_state.pose_offsets["pitch"]
+                                yaw -= st.session_state.pose_offsets["yaw"]
+                                roll -= st.session_state.pose_offsets["roll"]
+                                
+                                # Calibration Logic
+                                if st.session_state.calibration_active:
+                                    elapsed = time.time() - st.session_state.calibration_start_time
+                                    if elapsed < 5.0:
+                                        st.session_state.calibration_data.append((pitch, yaw, roll))
+                                        cv2.putText(frame, f"CALIBRATING... {5-elapsed:.1f}s", (20, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                                    else:
+                                        # Finish Calibration
+                                        st.session_state.calibration_active = False
+                                        data = st.session_state.calibration_data
+                                        if data:
+                                            avg_pitch = sum(p for p, y, r in data) / len(data)
+                                            avg_yaw = sum(y for p, y, r in data) / len(data)
+                                            avg_roll = sum(r for p, y, r in data) / len(data)
+                                            
+                                            # Update Offsets (Accumulate)
+                                            st.session_state.pose_offsets["pitch"] += avg_pitch
+                                            st.session_state.pose_offsets["yaw"] += avg_yaw
+                                            st.session_state.pose_offsets["roll"] += avg_roll
+                                            
+                                            st.sidebar.success(f"Calibration Complete! Offsets: P={avg_pitch:.1f}, Y={avg_yaw:.1f}, R={avg_roll:.1f}")
+
                                 # Draw Axis
                                 frame = pose_estimator.draw_axis(frame, rvec, tvec, cam_matrix)
                                 
-                                # Get Label
+                                # Get Label (using corrected values)
                                 label = pose_estimator.get_orientation_label(pitch, yaw, roll)
-                                
-                                # Overlay Label
-                                cv2.putText(frame, f"Head: {label}", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
                                 
                                 # Update Stats
                                 stats_placeholder.markdown(f"""
@@ -139,6 +178,7 @@ def main():
                                 - **Yaw**: {yaw:.1f}°
                                 - **Pitch**: {pitch:.1f}°
                                 - **Roll**: {roll:.1f}°
+                                - **Offsets**: P={st.session_state.pose_offsets['pitch']:.1f}, Y={st.session_state.pose_offsets['yaw']:.1f}, R={st.session_state.pose_offsets['roll']:.1f}
                                 """)
                     else:
                         stats_placeholder.info("No face detected.")
@@ -148,7 +188,7 @@ def main():
             
             # Display
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frame_placeholder.image(frame_rgb, channels="RGB", use_container_width=True)
+            frame_placeholder.image(frame_rgb, channels="RGB", width="stretch")
 
     elif not st.session_state.is_running:
          frame_placeholder.info("Click 'Start' to begin.")
