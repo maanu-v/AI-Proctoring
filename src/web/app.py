@@ -74,7 +74,8 @@ def main():
             st.session_state.calibration_active = True
             st.session_state.calibration_start_time = time.time()
             st.session_state.calibration_data = []
-            st.sidebar.info("Calibration started. Look straight at the screen for 5 seconds.")
+            st.sidebar.button("Calibrate Head Pose", disabled=True, key="cal_started_btn")
+            st.toast("Starting... Calibrating Head Pose (5s)", icon="⏳")
     
     if "is_running" not in st.session_state:
         st.session_state.is_running = False

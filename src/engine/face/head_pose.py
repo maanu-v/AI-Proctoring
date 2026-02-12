@@ -9,11 +9,11 @@ class HeadPoseEstimator:
         # 3D model points (generic face model)
         self.model_points = np.array([
             (0.0, 0.0, 0.0),             # Nose tip
-            (0.0, -330.0, -65.0),        # Chin
-            (-225.0, 170.0, -135.0),     # Left eye left corner
-            (225.0, 170.0, -135.0),      # Right eye right corner
-            (-150.0, -150.0, -125.0),    # Left Mouth corner
-            (150.0, -150.0, -125.0)      # Right mouth corner
+            (0.0, 330.0, 65.0),          # Chin
+            (-225.0, -170.0, 135.0),     # Left eye left corner
+            (225.0, -170.0, 135.0),      # Right eye right corner
+            (-150.0, 150.0, 125.0),      # Left Mouth corner
+            (150.0, 150.0, 125.0)        # Right mouth corner
         ])
 
     def estimate(self, face_landmarks, image_shape):
@@ -148,8 +148,8 @@ class HeadPoseEstimator:
         elif yaw > YAW_THRESH:
             label = "Looking LEFT"
         elif pitch < -PITCH_THRESH:
-            label = "Looking DOWN"
-        elif pitch > PITCH_THRESH:
             label = "Looking UP"
+        elif pitch > PITCH_THRESH:
+            label = "Looking DOWN"
             
         return label
