@@ -144,9 +144,9 @@ class HeadPoseEstimator:
         label = "Forward"
         
         if yaw < -YAW_THRESH:
-            label = "Looking LEFT"
-        elif yaw > YAW_THRESH:
             label = "Looking RIGHT"
+        elif yaw > YAW_THRESH:
+            label = "Looking LEFT"
         elif pitch < -PITCH_THRESH:
             label = "Looking DOWN"
         elif pitch > PITCH_THRESH:
