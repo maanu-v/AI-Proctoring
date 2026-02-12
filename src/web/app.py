@@ -24,6 +24,7 @@ st.sidebar.title("Settings")
 # Sidebar Configuration
 source_type = st.sidebar.radio("Video Source", ["Webcam", "Video File"])
 show_mesh = st.sidebar.checkbox("Show Face Mesh", value=True)
+show_head_pose = st.sidebar.checkbox("Show Head Pose & Axis", value=True)
 confidence = st.sidebar.slider("Min Detection Confidence", 0.0, 1.0, 0.5)
 
 # Global variables for caching
@@ -87,6 +88,10 @@ def main():
     if st.session_state.is_running and st.session_state.video_stream:
         stream = st.session_state.video_stream
         
+        # Initialize Estimators
+        from src.engine.face.head_pose import HeadPoseEstimator
+        pose_estimator = HeadPoseEstimator()
+        
         while stream.is_opened():
             ret, frame = stream.read()
             if not ret:
@@ -98,27 +103,52 @@ def main():
             # Process
             # Mirror the frame by default
             frame = cv2.flip(frame, 1)
-
-            if show_mesh:
-                timestamp_ms = int(time.time() * 1000)
+            
+            # Timestamp
+            timestamp_ms = int(time.time() * 1000)
+            
+            # 1. Face Mesh Detection
+            if show_mesh or show_head_pose:
                 try:
                     results = detector.process(frame, timestamp_ms)
-                    frame = detector.draw_landmarks(frame, results)
                     
-                    # Stats
-                    num_faces = len(results.face_landmarks) if results.face_landmarks else 0
-                    stats_placeholder.markdown(f"**Faces Detected:** {num_faces}")
+                    if results.face_landmarks:
+                        # Draw Mesh if enabled
+                        if show_mesh:
+                            frame = detector.draw_landmarks(frame, results)
+                        
+                        # Head Pose Estimation if enabled
+                        if show_head_pose:
+                            face_landmarks = results.face_landmarks[0]
+                            (pitch, yaw, roll), rvec, tvec, cam_matrix = pose_estimator.estimate(face_landmarks, frame.shape)
+                            
+                            if pitch is not None:
+                                # Draw Axis
+                                frame = pose_estimator.draw_axis(frame, rvec, tvec, cam_matrix)
+                                
+                                # Get Label
+                                label = pose_estimator.get_orientation_label(pitch, yaw, roll)
+                                
+                                # Overlay Label
+                                cv2.putText(frame, f"Head: {label}", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+                                
+                                # Update Stats
+                                stats_placeholder.markdown(f"""
+                                **Head Pose Analysis**:
+                                - **Direction**: {label}
+                                - **Yaw**: {yaw:.1f}°
+                                - **Pitch**: {pitch:.1f}°
+                                - **Roll**: {roll:.1f}°
+                                """)
+                    else:
+                        stats_placeholder.info("No face detected.")
+                        
                 except Exception as e:
                     logger.error(f"Processing error: {e}")
-                    st.error("Error processing frame")
-
+            
             # Display
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame_placeholder.image(frame_rgb, channels="RGB", use_container_width=True)
-            
-            # Optional: Throttle for file playback if it's too fast?
-            # cv2.waitKey(1) equivalent not needed for webcam, but for file...
-            # Streamlit is usually the bottleneck anyway.
 
     elif not st.session_state.is_running:
          frame_placeholder.info("Click 'Start' to begin.")
