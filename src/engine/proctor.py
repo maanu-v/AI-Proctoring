@@ -60,35 +60,36 @@ class ViolationTracker:
     def check_no_face(self, face_count, enabled, persistence_time):
         if not enabled:
             self.no_face_start_time = None
-            return False, False
+            return False, False, ""
             
         if face_count == 0:
             if self.no_face_start_time is None:
                 self.no_face_start_time = time.time()
                 # Not active yet, accumulating time
-                return False, False
+                return False, False, ""
             
             elapsed = time.time() - self.no_face_start_time
             if elapsed >= persistence_time:
                 # Active!
-                msg = f"No face detected for {persistence_time} seconds!"
+                msg = f"No face detected for {int(elapsed)} seconds."
                 
                 is_active = True
                 is_triggered = False
                 
                 # Debounce log
+                # Log if message is different (time changed) or time gap large enough
                 if not self.violations or (self.violations[-1]['message'] != msg) or (time.time() - self.violations[-1]['timestamp'] > 5.0):
                     self.log_violation(msg)
                     is_triggered = True
                     
-                return is_active, is_triggered
+                return is_active, is_triggered, msg
             else:
                  # Still waiting
-                 return False, False
+                 return False, False, ""
         else:
             # Face found, reset timer
             self.no_face_start_time = None
-            return False, False
+            return False, False, ""
 
     def check_head_pose(self, direction, persistence_time):
         """

@@ -230,15 +230,14 @@ def main():
                 else:
                     # No face detected
                     # Check No Face Violation with Persistence
-                    nf_active, nf_triggered = st.session_state.violation_tracker.check_no_face(
+                    nf_active, nf_triggered, nf_msg = st.session_state.violation_tracker.check_no_face(
                         0, 
                         config.thresholds.enable_no_face_warning, 
                         config.thresholds.violation_persistence_time
                     )
                     
                     if nf_triggered:
-                        last_msg = st.session_state.violation_tracker.violations[-1]['message']
-                        st.toast(last_msg, icon="⚠️")
+                        st.toast(nf_msg, icon="⚠️")
                         
                     if nf_active:
                          # Overlay Warning
