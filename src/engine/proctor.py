@@ -48,8 +48,11 @@ class ViolationTracker:
              is_triggered = False
              
              # simple dedup: if last violation was recent and same, don't trigger
-             if not self.violations or (self.violations[-1]['message'] != msg) or (time.time() - self.violations[-1]['timestamp'] > 2.0):
-                  self.log_violation(msg)
+             is_active = True
+             is_triggered = False
+             
+             # Log violation with type 'multiple_faces'
+             if self.log_violation(msg, violation_type='multiple_faces'):
                   is_triggered = True
              
              return is_active, is_triggered
@@ -76,10 +79,9 @@ class ViolationTracker:
                 is_active = True
                 is_triggered = False
                 
-                # Debounce log
-                # Log if message is different (time changed) or time gap large enough
-                if not self.violations or (self.violations[-1]['message'] != msg) or (time.time() - self.violations[-1]['timestamp'] > 5.0):
-                    self.log_violation(msg)
+                # Log violation with type 'no_face'
+                # The message changes (time increments), so we want to UPDATE the last log if it was also 'no_face'
+                if self.log_violation(msg, violation_type='no_face'):
                     is_triggered = True
                     
                 return is_active, is_triggered, msg
@@ -128,20 +130,96 @@ class ViolationTracker:
             is_active = True
             is_triggered = False
             
-            # Debounce log
-            if not self.violations or (self.violations[-1]['message'] != msg) or (time.time() - self.violations[-1]['timestamp'] > 5.0):
-                self.log_violation(msg)
+            # Log violation with type 'head_pose'
+            # We want to consolidate continuous looking away in the same direction
+            
+            # Use a specific type for direction? e.g. 'head_pose_Right'
+            # Or just 'head_pose' and rely on message update?
+            # If user switches from Right to Left rapidly, we probably want separate logs.
+            # So let's include direction in type or just use generic 'head_pose' but rely on logic.
+            
+            # If I use 'head_pose', and message changes from "Looking Right..." to "Looking Left...", 
+            # ideally that should be a new entry? 
+            # My logic in log_violation will update if type is same.
+            # So if I use type='head_pose', "Looking Right" might be replaced by "Looking Left".
+            # That's probably okay or maybe desired.
+            # But let's use direction-specific type to be safe? 
+            # Actually, "looking somewhere other than forward" is the violation.
+            # If I stick to `violation_type='head_pose'`, it will just update the text.
+            # "User looking Right for 5s" -> "User looking Left for 6s" (if they switch instantly).
+            # That might be confusing.
+            # Let's make type specific to direction: f'head_pose_{direction}'
+            
+            if self.log_violation(msg, violation_type=f'head_pose_{direction}'):
                 is_triggered = True
             
             return is_active, is_triggered, msg
         
         return False, False, ""
 
-    def log_violation(self, message):
+    def log_violation(self, message, violation_type=None):
+        """
+        Log a violation. If it's a continuation of the previous violation (same type, recent),
+        update the existing entry instead of creating a new one.
+        Returns True if a new log entry was added or an existing one was updated (triggering a toast).
+        """
+        current_time = time.time()
+        
+        if self.violations:
+            last_violation = self.violations[-1]
+            last_type = last_violation.get('type')
+            last_time = last_violation.get('timestamp')
+            
+            # Check if this is a continuation
+            # Same type and within 2 seconds (allow for some processing jitter)
+            if violation_type is not None and last_type == violation_type and (current_time - last_time < 2.0):
+                # Update existing violation
+                # Check if message is different only? 
+                # Actually, we always want to update timestamp to keep it "alive"
+                # And update message to show new duration
+                
+                # Only return True (trigger toast) if message CHANGED substantially?
+                # The user wants toast for "3 sec", "4 sec".
+                # But maybe we don't want to spam toast every second?
+                # The prompt says: "if no face is detected for 6 sec ... instead of adding 4 entries ... make it as a single entry"
+                # "also note that we have to add it with timestamps"
+                
+                # For LOGS: single entry updating.
+                # For TOAST: The app code triggers toast if `is_triggered` is True.
+                # If `log_violation` returns True every time we update, we spam toasts.
+                # Maybe we only return True on NEW entry?
+                # The user said: "a violation log and toast shld be added ... for 4 sec also it shuld be added kinda as like we did in head_psoe"
+                # This implies they WANT the toast notification potentially.
+                # But for logs, they want single entry.
+                
+                # Let's update the log entry in place.
+                msg_changed = (last_violation['message'] != message)
+                last_violation['message'] = message
+                last_violation['timestamp'] = current_time
+                # We do NOT append.
+                
+                # Do we return True?
+                # If we return True, `app.py` shows a toast.
+                # If we return False, `app.py` does nothing.
+                # If we want toast updates, we should return True.
+                # But typical toast behavior is to show briefly. If we spam it, it might stack up.
+                # Streamlit `st.toast` stacks. 
+                # If we want to avoid stack spam, maybe we throttle toasts in app.py or here?
+                # Let's return True effectively "triggering" the event, but let app handle it.
+                # Wait, if I return True, `hp_triggered` becomes True, and `app.py` runs `st.toast(hp_msg)`.
+                # If this happens every frame (buffered by sleep(0.03) but logic is every second?), we get many toasts.
+                # The user query was specifically about LOGS: "make it as a single entry like no face detected for 6 seconds".
+
+                # Update: User specifically requested only toast updates per second change
+                return msg_changed
+        
+        # New violation
         self.violations.append({
-            "timestamp": time.time(),
-            "message": message
+            "timestamp": current_time,
+            "message": message,
+            "type": violation_type
         })
+        return True
 
     def get_logs(self):
         return self.violations
