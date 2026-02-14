@@ -13,6 +13,16 @@ mediapipe:
   # Maximum number of faces MediaPipe will track simultaneously.
   num_faces: 5
 
+head_pose:
+  # Thresholds for head pose classification (in degrees).
+  # Optimal values for proctoring to balance sensitivity and false positives:
+  # Yaw: 30 (Allows looking at screen edges/dual monitors)
+  # Pitch: 20 (Detects looking down at phone/notes but allows keyboard view)
+  # Roll: 25 (Standard head tilt allowance)
+  yaw_threshold: 30
+  pitch_threshold: 20
+  roll_threshold: 25
+
 thresholds:
   # Maximum allowed faces in the frame before triggering a violation.
   max_num_faces: 1

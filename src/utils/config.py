@@ -15,6 +15,12 @@ class MediaPipeConfig:
     num_faces: int = 1
 
 @dataclass
+class HeadPoseConfig:
+    yaw_threshold: float = 30.0
+    pitch_threshold: float = 25.0
+    roll_threshold: float = 25.0
+
+@dataclass
 class ThresholdsConfig:
     max_num_faces: int = 1
     enable_no_face_warning: bool = True
@@ -27,6 +33,7 @@ class Config:
         
         self.camera = CameraConfig(**self._config.get("camera", {}).get("params", {}))
         self.mediapipe = MediaPipeConfig(**self._config.get("mediapipe", {}))
+        self.head_pose = HeadPoseConfig(**self._config.get("head_pose", {}))
         self.thresholds = ThresholdsConfig(**self._config.get("thresholds", {}))
 
     def _load_config(self) -> Dict[str, Any]:

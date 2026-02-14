@@ -4,6 +4,7 @@ import tempfile
 import time
 import sys
 import os
+import base64
 from typing import Union
 
 # Add project root to path
@@ -11,6 +12,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')
 
 from src.core.video_stream import VideoStream
 from src.engine.face.mesh_detector import MeshDetector
+from src.engine.face.head_pose import HeadPoseEstimator
 from src.utils.config import config
 from src.utils.logger import get_logger
 
@@ -24,6 +26,7 @@ st.sidebar.title("Settings")
 # Sidebar Configuration
 source_type = st.sidebar.radio("Video Source", ["Webcam", "Video File"])
 show_mesh = st.sidebar.checkbox("Show Face Mesh", value=True)
+enable_head_pose = st.sidebar.checkbox("Enable Head Pose Analysis", value=False)
 
 st.sidebar.caption(f"System: Max Detectable Faces={config.mediapipe.num_faces}")
 st.sidebar.caption(f"Violation Threshold: > {config.thresholds.max_num_faces} faces")
@@ -43,8 +46,22 @@ if "violation_tracker" not in st.session_state:
 def get_mesh_detector(num_faces):
     return MeshDetector()
 
+def frame_to_base64(frame):
+    """Convert a CV2 frame to a base64 string for HTML display."""
+    _, buffer = cv2.imencode('.jpg', frame)
+    return base64.b64encode(buffer).decode('utf-8')
+
+@st.cache_resource
+def get_head_pose_estimator():
+    return HeadPoseEstimator(
+        yaw_threshold=config.head_pose.yaw_threshold,
+        pitch_threshold=config.head_pose.pitch_threshold,
+        roll_threshold=config.head_pose.roll_threshold
+    )
+
 def main():
     detector = get_mesh_detector(config.mediapipe.num_faces)
+    pose_estimator = get_head_pose_estimator()
     
     # Source Selection Logic
     source: Union[int, str] = config.camera.index
@@ -166,12 +183,28 @@ def main():
                         cv2.rectangle(frame, (0, 0), (frame.shape[1], frame.shape[0]), (0, 0, 255), 10)
                     
                     # Update Stats
-                    stats_placeholder.markdown(f"""
-                    **Face Analysis**:
-                    - **Faces Detected**: {face_count} (Max: {config.thresholds.max_num_faces})
+                    stats_markdown = f"""
+**Violations**: {st.session_state.violation_tracker.get_violation_count()}
+
+**Face Analysis**  
+- Faces Detected: {face_count} (Max: {config.thresholds.max_num_faces})
+"""
+
+                    if enable_head_pose:
+                        poses = pose_estimator.extract_pose(results)
+                        if poses:
+                             stats_markdown += "\n**Head Pose Analysis**\n"
+                             for i, pose in enumerate(poses):
+                                 direction = pose_estimator.classify_direction(pose)
+                                 stats_markdown += f"""
+**Face {i+1}**
+- Yaw: {pose['yaw']:.1f}°
+- Pitch: {pose['pitch']:.1f}°
+- Roll: {pose['roll']:.1f}°
+- Direction: {direction}
+"""
                     
-                    **Violations**: {st.session_state.violation_tracker.get_violation_count()}
-                    """)
+                    stats_placeholder.markdown(stats_markdown)
 
                 else:
                     # No face detected
@@ -203,8 +236,12 @@ def main():
                 logger.error(f"Processing error: {e}")
             
             # Display
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frame_placeholder.image(frame_rgb, channels="RGB", width="stretch")
+            # Convert to HTML to avoid Streamlit MediaFileStorageError
+            b64_frame = frame_to_base64(frame)
+            frame_placeholder.markdown(
+                f'<img src="data:image/jpeg;base64,{b64_frame}" style="width: 100%;" />',
+                unsafe_allow_html=True
+            )
 
             # Update Logs Live
             with log_placeholder.container():
