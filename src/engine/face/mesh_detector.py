@@ -7,6 +7,7 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from mediapipe.tasks.python.vision import drawing_utils
 from mediapipe.tasks.python.vision import drawing_styles
+from src.utils.config import config
 from src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -18,7 +19,7 @@ class MeshDetector:
             base_options=base_options,
             output_face_blendshapes=True,
             output_facial_transformation_matrixes=True,
-            num_faces=1,
+            num_faces=config.mediapipe.num_faces,
             min_face_detection_confidence=0.5,
             min_face_presence_confidence=0.5,
             min_tracking_confidence=0.5,
@@ -26,7 +27,7 @@ class MeshDetector:
         )
         try:
             self.landmarker = vision.FaceLandmarker.create_from_options(options)
-            logger.info("Face Landmarker initialized successfully.")
+            logger.info(f"Face Landmarker initialized successfully with num_faces={config.mediapipe.num_faces}")
         except Exception as e:
             logger.error(f"Failed to initialize Face Landmarker: {e}")
             raise

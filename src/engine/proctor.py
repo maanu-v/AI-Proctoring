@@ -1,80 +1,50 @@
+
 import time
-from typing import List, Dict, Optional
-from dataclasses import dataclass, asdict
-from src.utils.logger import get_logger
-
-logger = get_logger(__name__)
-
-@dataclass
-class ViolationEvent:
-    timestamp: float
-    type: str
-    duration: float
-    message: str
 
 class ViolationTracker:
-    def __init__(self, away_threshold_seconds: float = 5.0):
-        self.away_threshold = away_threshold_seconds
-        self.current_away_start: Optional[float] = None
-        self.violations: List[ViolationEvent] = []
-        self.is_warning_active: bool = False
-        
-    def check_head_pose(self, direction_label: str) -> tuple[bool, bool]:
-        """
-        Checks head pose direction.
-        Returns (is_warning_active, just_triggered).
-        """
-        is_looking_away = direction_label != "Forward"
-        now = time.time()
-        just_triggered = False
-        
-        if is_looking_away:
-            if self.current_away_start is None:
-                self.current_away_start = now
-            
-            elapsed = now - self.current_away_start
-            
-            if elapsed > self.away_threshold:
-                if not self.is_warning_active:
-                    # New violation triggered
-                    self.is_warning_active = True
-                    just_triggered = True
-                    
-                    msg = f"WARNING - Violation triggered: {direction_label} for {elapsed:.1f}s"
-                    self.violations.append(ViolationEvent(
-                        timestamp=now,
-                        type="VIOLATION_START",
-                        duration=0.0,
-                        message=msg
-                    ))
-                    logger.warning(msg)
-        else:
-            # User looked back
-            if self.current_away_start is not None:
-                elapsed = now - self.current_away_start
-                if self.is_warning_active:
-                    # Violation ended
-                    msg = f"INFO - Violation ended. Duration: {elapsed:.1f}s"
-                    self.violations.append(ViolationEvent(
-                        timestamp=now,
-                        type="VIOLATION_END",
-                        duration=elapsed,
-                        message=msg
-                    ))
-                    logger.info(msg)
-                
-                self.current_away_start = None
-                self.is_warning_active = False
-                
-        return self.is_warning_active, just_triggered
-
-    def get_violation_count(self) -> int:
-        return len(self.violations)
-        
-    def get_logs(self) -> List[Dict]:
-        return [asdict(v) for v in self.violations]
-    
-    def reset(self):
-        self.current_away_start = None
+    def __init__(self):
         self.violations = []
-        self.is_warning_active = False
+
+    def reset(self):
+        self.violations = []
+
+    def check_face_count(self, face_count, max_faces):
+        if face_count > max_faces:
+             # Limit log frequency or just log
+             # For simplicity, we log if it's a new violation or just return status
+             # But the app logic expects (active, triggered)
+             # Let's say we log it.
+             msg = f"Multiple faces detected: {face_count}"
+             # Avoid spamming logs?
+             # The original app likely handled debouncing or the user doesn't care about spam yet.
+             # I'll add a simple check to not spam identical messages within 1 sec if needed, 
+             # but strictly following "log violation" logic.
+             
+             # Actually, if we look at app.py:
+             # hp_active, hp_triggered = ...
+             # if hp_triggered ... st.toast
+             
+             # So this method should return (is_active, is_newly_triggered)
+             
+             is_active = True
+             is_triggered = False
+             
+             # simple dedup: if last violation was recent and same, don't trigger
+             if not self.violations or (self.violations[-1]['message'] != msg) or (time.time() - self.violations[-1]['timestamp'] > 2.0):
+                  self.log_violation(msg)
+                  is_triggered = True
+             
+             return is_active, is_triggered
+        return False, False
+
+    def log_violation(self, message):
+        self.violations.append({
+            "timestamp": time.time(),
+            "message": message
+        })
+
+    def get_logs(self):
+        return self.violations
+
+    def get_violation_count(self):
+        return len(self.violations)

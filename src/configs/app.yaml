@@ -6,14 +6,7 @@ camera:
     fps: 30
 
 mediapipe:
-  num_faces: 1
-  min_detection_confidence: 0.5
-  min_tracking_confidence: 0.5
+  num_faces: 5
 
 thresholds:
-  ear_blink: 0.25
-  mar_mouth: 0.6
-  head_pose:
-    yaw: 20
-    pitch: 15
-    roll: 15
+  max_num_faces: 1

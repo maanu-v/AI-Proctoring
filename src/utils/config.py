@@ -13,14 +13,10 @@ class CameraConfig:
 @dataclass
 class MediaPipeConfig:
     num_faces: int = 1
-    min_detection_confidence: float = 0.5
-    min_tracking_confidence: float = 0.5
 
 @dataclass
 class ThresholdsConfig:
-    ear_blink: float = 0.25
-    mar_mouth: float = 0.6
-    head_pose: Dict[str, float] = field(default_factory=lambda: {"yaw": 20, "pitch": 15, "roll": 15})
+    max_num_faces: int = 1
 
 class Config:
     def __init__(self, config_path: str = "src/configs/app.yaml"):
