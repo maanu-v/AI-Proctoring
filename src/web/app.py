@@ -100,6 +100,10 @@ def main():
         st.subheader("Analysis")
         stats_placeholder = st.empty()
 
+    # Sidebar Log Placeholder
+    with st.sidebar.expander("Proctoring Logs", expanded=True):
+        log_placeholder = st.empty()
+
     # Processing Loop
     if st.session_state.is_running and st.session_state.video_stream:
         stream = st.session_state.video_stream
@@ -135,7 +139,14 @@ def main():
                     # Check Violations
                     # Multiple Faces Only
                     face_count = len(results.face_landmarks)
-                    fc_active, fc_triggered = st.session_state.violation_tracker.check_face_count(face_count, config.thresholds.max_num_faces)
+                    fc_active, fc_triggered = st.session_state.violation_tracker.check_face_count(
+                        face_count, 
+                        config.thresholds.max_num_faces,
+                        config.thresholds.violation_persistence_time
+                    )
+
+                    # Also reset no face timer since we found a face
+                    st.session_state.violation_tracker.check_no_face(face_count, True, 0)
                     
                     if fc_triggered:
                         # Assuming ViolationTracker returns triggered status
@@ -163,7 +174,30 @@ def main():
                     """)
 
                 else:
-                    stats_placeholder.info("No face detected.")
+                    # No face detected
+                    # Check No Face Violation with Persistence
+                    nf_active, nf_triggered = st.session_state.violation_tracker.check_no_face(
+                        0, 
+                        config.thresholds.enable_no_face_warning, 
+                        config.thresholds.violation_persistence_time
+                    )
+                    
+                    if nf_triggered:
+                        last_msg = st.session_state.violation_tracker.violations[-1]['message']
+                        st.toast(last_msg, icon="⚠️")
+                        
+                    if nf_active:
+                         # Overlay Warning
+                        cv2.putText(frame, "WARNING: NO FACE DETECTED!", (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 4)
+                        cv2.rectangle(frame, (0, 0), (frame.shape[1], frame.shape[0]), (0, 0, 255), 10)
+                        
+                    # Update Stats (Show 0 faces)
+                    stats_placeholder.markdown(f"""
+                    **Face Analysis**:
+                    - **Faces Detected**: 0 (Max: {config.thresholds.max_num_faces})
+                    
+                    **Violations**: {st.session_state.violation_tracker.get_violation_count()}
+                    """)
                     
             except Exception as e:
                 logger.error(f"Processing error: {e}")
@@ -172,12 +206,13 @@ def main():
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame_placeholder.image(frame_rgb, channels="RGB", width="stretch")
 
-        with st.sidebar.expander("Proctoring Logs", expanded=True):
-            if st.session_state.violation_tracker.get_violation_count() > 0:
-                for v in reversed(st.session_state.violation_tracker.get_logs()):
-                    st.warning(f"{time.strftime('%H:%M:%S', time.localtime(v['timestamp']))}: {v['message']}")
-            else:
-                st.info("No violations detected.")
+            # Update Logs Live
+            with log_placeholder.container():
+                if st.session_state.violation_tracker.get_violation_count() > 0:
+                     for v in reversed(st.session_state.violation_tracker.get_logs()):
+                        st.warning(f"{time.strftime('%H:%M:%S', time.localtime(v['timestamp']))}: {v['message']}")
+                else:
+                    st.info("No violations detected.")
 
     elif not st.session_state.is_running:
          frame_placeholder.info("Click 'Start' to begin.")

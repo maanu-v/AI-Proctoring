@@ -17,6 +17,8 @@ class MediaPipeConfig:
 @dataclass
 class ThresholdsConfig:
     max_num_faces: int = 1
+    enable_no_face_warning: bool = True
+    violation_persistence_time: float = 5.0
 
 class Config:
     def __init__(self, config_path: str = "src/configs/app.yaml"):

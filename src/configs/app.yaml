@@ -10,3 +10,5 @@ mediapipe:
 
 thresholds:
   max_num_faces: 1
+  enable_no_face_warning: true
+  violation_persistence_time: 5
