@@ -1,14 +1,22 @@
 camera:
   params:
+    # Camera index. 0 is typically the default webcam.
     index: 0
+    # Capture width resolution.
     width: 640
+    # Capture height resolution.
     height: 480
+    # Frames per second for video capture.
     fps: 30
 
 mediapipe:
+  # Maximum number of faces MediaPipe will track simultaneously.
   num_faces: 5
 
 thresholds:
+  # Maximum allowed faces in the frame before triggering a violation.
   max_num_faces: 1
+  # Enable/disable the "No Face Detected" warning overlay and toast.
   enable_no_face_warning: true
+  # Duration in seconds a condition (no face or multi-face) must persist to trigger a warning.
   violation_persistence_time: 5
