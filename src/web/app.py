@@ -203,6 +203,13 @@ def main():
 - Roll: {pose['roll']:.1f}°
 - Direction: {direction}
 """
+                                 # Draw Axes
+                                 if results.face_landmarks and i < len(results.face_landmarks):
+                                     landmarks = results.face_landmarks[i]
+                                     nose = landmarks[1] # Tip of nose
+                                     h, w, _ = frame.shape
+                                     nx, ny = int(nose.x * w), int(nose.y * h)
+                                     frame = pose_estimator.draw_axes(frame, pose['pitch'], pose['yaw'], pose['roll'], nx, ny)
                     
                     stats_placeholder.markdown(stats_markdown)
 
