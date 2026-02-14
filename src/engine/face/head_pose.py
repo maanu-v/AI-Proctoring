@@ -3,6 +3,7 @@
 import numpy as np
 import cv2
 import math
+from collections import deque
 
 class HeadPoseEstimator:
     def __init__(self, yaw_threshold=30, pitch_threshold=25, roll_threshold=25):
@@ -13,6 +14,25 @@ class HeadPoseEstimator:
         self.yaw_threshold = yaw_threshold
         self.pitch_threshold = pitch_threshold
         self.roll_threshold = roll_threshold
+        
+        # Smoothing buffers per face index
+        # Key: face_index, Value: {'pitch': deque, 'yaw': deque, 'roll': deque}
+        self.window_size = 5
+        self.pose_buffers = {}
+        
+        # Calibration offsets per face index
+        # Key: face_index, Value: {'pitch': float, 'yaw': float, 'roll': float}
+        self.offsets = {}
+
+    def set_calibration_offsets(self, face_index, pitch, yaw, roll):
+        """
+        Set calibration offsets for a specific face index.
+        """
+        self.offsets[face_index] = {
+            'pitch': pitch,
+            'yaw': yaw,
+            'roll': roll
+        }
 
     def extract_pose(self, result):
         """
@@ -24,7 +44,7 @@ class HeadPoseEstimator:
 
         poses = []
 
-        for matrix in result.facial_transformation_matrixes:
+        for i, matrix in enumerate(result.facial_transformation_matrixes):
             mat = np.array(matrix).reshape(4, 4)
 
             R = mat[:3, :3]
@@ -40,11 +60,37 @@ class HeadPoseEstimator:
                 pitch = np.arctan2(-R[1, 2], R[1, 1])
                 yaw = np.arctan2(-R[2, 0], sy)
                 roll = 0
+            
+            # Convert to degrees
+            pitch_deg = np.degrees(pitch)
+            yaw_deg = np.degrees(yaw)
+            roll_deg = np.degrees(roll)
+            
+            # Apply Calibration Offsets if available
+            if i in self.offsets:
+                pitch_deg -= self.offsets[i]['pitch']
+                yaw_deg -= self.offsets[i]['yaw']
+                roll_deg -= self.offsets[i]['roll']
+
+            if i not in self.pose_buffers:
+                self.pose_buffers[i] = {
+                    'pitch': deque(maxlen=self.window_size),
+                    'yaw': deque(maxlen=self.window_size),
+                    'roll': deque(maxlen=self.window_size)
+                }
+            
+            self.pose_buffers[i]['pitch'].append(pitch_deg)
+            self.pose_buffers[i]['yaw'].append(yaw_deg)
+            self.pose_buffers[i]['roll'].append(roll_deg)
+            
+            smooth_pitch = np.mean(self.pose_buffers[i]['pitch'])
+            smooth_yaw = np.mean(self.pose_buffers[i]['yaw'])
+            smooth_roll = np.mean(self.pose_buffers[i]['roll'])
 
             poses.append({
-                "pitch": np.degrees(pitch),
-                "yaw": np.degrees(yaw),
-                "roll": np.degrees(roll)
+                "pitch": smooth_pitch,
+                "yaw": smooth_yaw,
+                "roll": smooth_roll
             })
 
         return poses

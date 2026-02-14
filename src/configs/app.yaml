@@ -22,6 +22,10 @@ head_pose:
   yaw_threshold: 30
   pitch_threshold: 20
   roll_threshold: 25
+  # Enable auto-calibration at startup to determine "forward" 0-point.
+  auto_calibration: true
+  # Seconds to calibrate.
+  calibration_time: 3
 
 thresholds:
   # Maximum allowed faces in the frame before triggering a violation.

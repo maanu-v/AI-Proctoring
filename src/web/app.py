@@ -143,6 +143,72 @@ def main():
             # Timestamp
             timestamp_ms = int(time.time() * 1000)
             
+            # Calibration Logic
+            if config.head_pose.auto_calibration and "calibration_done" not in st.session_state:
+                if "calibration_start" not in st.session_state:
+                    st.session_state.calibration_start = time.time()
+                    st.session_state.calibration_data = {0: {'pitch': [], 'yaw': [], 'roll': []}} # Buffer for face 0
+                    st.toast("Calibrating... Please look forward.", icon="🎯")
+                
+                elapsed = time.time() - st.session_state.calibration_start
+                remaining = config.head_pose.calibration_time - elapsed
+                
+                if remaining > 0:
+                    # Show Calibration Overlay
+                    cv2.putText(frame, f"CALIBRATING... {int(remaining)+1}s", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 3)
+                    cv2.putText(frame, "LOOK FORWARD", (50, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 3)
+                    
+                    # Collect Data
+                    results = detector.process(frame, timestamp_ms)
+                    if results.face_landmarks:
+                        # Use raw pose extraction (we haven't set offsets yet)
+                        # We need valid poses to average.
+                        # Note: pose_estimator.extract_pose ALREADY applies offsets if set.
+                        # Initial offsets are empty, so it returns raw-ish (smoothed) values.
+                        poses = pose_estimator.extract_pose(results)
+                        if poses:
+                            # Assume main face is index 0 for calibration
+                            pose = poses[0]
+                            st.session_state.calibration_data[0]['pitch'].append(pose['pitch'])
+                            st.session_state.calibration_data[0]['yaw'].append(pose['yaw'])
+                            st.session_state.calibration_data[0]['roll'].append(pose['roll'])
+                            
+                            # Draw mesh/axes during calibration too?
+                            if show_mesh:
+                                frame = detector.draw_landmarks(frame, results)
+                            # Draw axes for visual feedback
+                            # ... (reuse drawing logic or just show overlay)
+                else:
+                    # Finish Calibration
+                    data = st.session_state.calibration_data[0]
+                    if data['pitch']:
+                        avg_pitch = sum(data['pitch']) / len(data['pitch'])
+                        avg_yaw = sum(data['yaw']) / len(data['yaw'])
+                        avg_roll = sum(data['roll']) / len(data['roll'])
+                        
+                        pose_estimator.set_calibration_offsets(0, avg_pitch, avg_yaw, avg_roll)
+                        logger.info(f"Calibration Complete. Offsets: P={avg_pitch:.1f}, Y={avg_yaw:.1f}, R={avg_roll:.1f}")
+                        st.toast("Calibration Complete!", icon="✅")
+                    else:
+                        st.warning("Calibration failed: No face detected.")
+                    
+                    st.session_state.calibration_done = True
+                    # Clean up
+                    del st.session_state.calibration_start
+                    del st.session_state.calibration_data
+                    
+                # Skip normal processing loop during calibration?
+                # Yes, to avoid triggering violations while calibrating.
+                
+                # Display Frame
+                b64_frame = frame_to_base64(frame)
+                frame_placeholder.markdown(
+                    f'<img src="data:image/jpeg;base64,{b64_frame}" style="width: 100%;" />',
+                    unsafe_allow_html=True
+                )
+                continue 
+
+            
             # 1. Face Mesh Detection
             # Only run if we need mesh or checks, but user wants check so run always
             try:

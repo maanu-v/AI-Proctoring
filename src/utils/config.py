@@ -19,6 +19,8 @@ class HeadPoseConfig:
     yaw_threshold: float = 30.0
     pitch_threshold: float = 25.0
     roll_threshold: float = 25.0
+    auto_calibration: bool = False
+    calibration_time: int = 3
 
 @dataclass
 class ThresholdsConfig:
