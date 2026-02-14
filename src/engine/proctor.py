@@ -6,11 +6,15 @@ class ViolationTracker:
         self.violations = []
         self.no_face_start_time = None
         self.face_count_start_time = None
+        self.head_pose_start_time = None
+        self.last_pose_direction = None
 
     def reset(self):
         self.violations = []
         self.no_face_start_time = None
         self.face_count_start_time = None
+        self.head_pose_start_time = None
+        self.last_pose_direction = None
 
     def check_face_count(self, face_count, max_faces, persistence_time=0):
         if face_count > max_faces:
@@ -85,6 +89,52 @@ class ViolationTracker:
             # Face found, reset timer
             self.no_face_start_time = None
             return False, False
+
+    def check_head_pose(self, direction, persistence_time):
+        """
+        Check if the user is looking away for longer than persistence_time.
+        Returns: (is_active, is_triggered, duration_message)
+        """
+        if direction == "Forward":
+            self.head_pose_start_time = None
+            self.last_pose_direction = None
+            return False, False, ""
+
+        # Looking away
+        if self.head_pose_start_time is None:
+            # New potential violation
+            self.head_pose_start_time = time.time()
+            self.last_pose_direction = direction
+            return False, False, ""
+        
+        # Check if direction changed (e.g. from Left to Right)
+        # If changed, reset timer? Or keep accumulating if still not forward?
+        # Requirement: "looking somewhere other than forward"
+        # So arguably, switching from Left to Right is still "not Forward".
+        # But if we want to log "Looking Right for 5s", tracking specific direction is better.
+        # Let's track specific direction for better logs.
+        if direction != self.last_pose_direction:
+             # Reset timer for new direction
+             self.head_pose_start_time = time.time()
+             self.last_pose_direction = direction
+             return False, False, ""
+
+        elapsed = time.time() - self.head_pose_start_time
+        if elapsed >= persistence_time:
+            # Violation!
+            msg = f"User looking {direction} for {int(elapsed)} seconds."
+            
+            is_active = True
+            is_triggered = False
+            
+            # Debounce log
+            if not self.violations or (self.violations[-1]['message'] != msg) or (time.time() - self.violations[-1]['timestamp'] > 5.0):
+                self.log_violation(msg)
+                is_triggered = True
+            
+            return is_active, is_triggered, msg
+        
+        return False, False, ""
 
     def log_violation(self, message):
         self.violations.append({

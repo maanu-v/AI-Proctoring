@@ -210,6 +210,20 @@ def main():
                                      h, w, _ = frame.shape
                                      nx, ny = int(nose.x * w), int(nose.y * h)
                                      frame = pose_estimator.draw_axes(frame, pose['pitch'], pose['yaw'], pose['roll'], nx, ny)
+                                
+                                 # Check Head Pose Violations (Per Face)
+                                 # For simplicity, if ANY face is looking away, trigger violation.
+                                 # Or maybe just the "main" face? Let's assume all faces count.
+                                 hp_active, hp_triggered, hp_msg = st.session_state.violation_tracker.check_head_pose(
+                                     direction, config.thresholds.violation_persistence_time
+                                 )
+                                 
+                                 if hp_triggered:
+                                     st.toast(hp_msg, icon="⚠️")
+                                     
+                                 if hp_active:
+                                     cv2.putText(frame, f"WARNING: {direction.upper()}!", (50, 100 + i*50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                                     cv2.rectangle(frame, (0, 0), (frame.shape[1], frame.shape[0]), (0, 0, 255), 10)
                     
                     stats_placeholder.markdown(stats_markdown)
 

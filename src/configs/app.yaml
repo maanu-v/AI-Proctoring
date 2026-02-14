@@ -29,4 +29,4 @@ thresholds:
   # Enable/disable the "No Face Detected" warning overlay and toast.
   enable_no_face_warning: true
   # Duration in seconds a condition (no face or multi-face) must persist to trigger a warning.
-  violation_persistence_time: 5
+  violation_persistence_time: 3
