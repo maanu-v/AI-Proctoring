@@ -28,5 +28,9 @@ thresholds:
   max_num_faces: 1
   # Enable/disable the "No Face Detected" warning overlay and toast.
   enable_no_face_warning: true
-  # Duration in seconds a condition (no face or multi-face) must persist to trigger a warning.
-  violation_persistence_time: 3
+  # Duration in seconds a multi-face condition must persist to trigger a warning.
+  multi_face_persistence_time: 3
+  # Duration in seconds a no-face condition must persist to trigger a warning.
+  no_face_persistence_time: 2
+  # Duration in seconds a head pose violation must persist to trigger a warning.
+  head_pose_persistence_time: 3

@@ -159,7 +159,7 @@ def main():
                     fc_active, fc_triggered = st.session_state.violation_tracker.check_face_count(
                         face_count, 
                         config.thresholds.max_num_faces,
-                        config.thresholds.violation_persistence_time
+                        config.thresholds.multi_face_persistence_time
                     )
 
                     # Also reset no face timer since we found a face
@@ -179,7 +179,7 @@ def main():
                     
                     if fc_active:
                         # Overlay Warning
-                        cv2.putText(frame, "WARNING: MULTIPLE FACES!", (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 4)
+                        cv2.putText(frame, "WARNING: MULTIPLE FACES!", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
                         cv2.rectangle(frame, (0, 0), (frame.shape[1], frame.shape[0]), (0, 0, 255), 10)
                     
                     # Update Stats
@@ -215,7 +215,7 @@ def main():
                                  # For simplicity, if ANY face is looking away, trigger violation.
                                  # Or maybe just the "main" face? Let's assume all faces count.
                                  hp_active, hp_triggered, hp_msg = st.session_state.violation_tracker.check_head_pose(
-                                     direction, config.thresholds.violation_persistence_time
+                                     direction, config.thresholds.head_pose_persistence_time
                                  )
                                  
                                  if hp_triggered:
@@ -233,7 +233,7 @@ def main():
                     nf_active, nf_triggered, nf_msg = st.session_state.violation_tracker.check_no_face(
                         0, 
                         config.thresholds.enable_no_face_warning, 
-                        config.thresholds.violation_persistence_time
+                        config.thresholds.no_face_persistence_time
                     )
                     
                     if nf_triggered:
@@ -241,7 +241,7 @@ def main():
                         
                     if nf_active:
                          # Overlay Warning
-                        cv2.putText(frame, "WARNING: NO FACE DETECTED!", (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 4)
+                        cv2.putText(frame, "WARNING: NO FACE DETECTED!", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
                         cv2.rectangle(frame, (0, 0), (frame.shape[1], frame.shape[0]), (0, 0, 255), 10)
                         
                     # Update Stats (Show 0 faces)
