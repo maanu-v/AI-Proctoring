@@ -9,5 +9,6 @@ dependencies = [
     "mediapipe",
     "numpy",
     "streamlit",
-    "pyyaml"
+    "pyyaml",
+    "ultralytics>=8.4.14",
 ]

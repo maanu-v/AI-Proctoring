@@ -13,6 +13,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')
 from src.core.video_stream import VideoStream
 from src.engine.face.mesh_detector import MeshDetector
 from src.engine.face.head_pose import HeadPoseEstimator
+from src.engine.obj_detection.obj_detect import ObjectDetector
 from src.utils.config import config
 from src.utils.logger import get_logger
 
@@ -59,9 +60,20 @@ def get_head_pose_estimator():
         roll_threshold=config.head_pose.roll_threshold
     )
 
+@st.cache_resource
+def get_object_detector():
+    return ObjectDetector()
+
 def main():
     detector = get_mesh_detector(config.mediapipe.num_faces)
     pose_estimator = get_head_pose_estimator()
+    obj_detector = get_object_detector()
+    
+    # Frame Counter for skipping object detection frames
+    if "frame_count" not in st.session_state:
+        st.session_state.frame_count = 0
+    if "last_obj_data" not in st.session_state:
+        st.session_state.last_obj_data = {}
     
     # Source Selection Logic
     source: Union[int, str] = config.camera.index
@@ -130,8 +142,12 @@ def main():
             if not ret:
                 st.warning("End of video or failed to read frame.")
                 st.session_state.is_running = False
+                st.session_state.is_running = False
                 stream.stop()
                 break
+            
+            st.session_state.frame_count += 1
+
                 
             # Global FPS Throttling to prevent Streamlit MediaFileStorageError
             # Cap at ~30 FPS
@@ -214,6 +230,25 @@ def main():
             try:
                 results = detector.process(frame, timestamp_ms)
                 
+                # 2. Object Detection (Every 30 frames ~ 1 sec)
+                if st.session_state.frame_count % 30 == 0:
+                    st.session_state.last_obj_data = obj_detector.detect(frame)
+                
+                obj_data = st.session_state.last_obj_data
+                
+                # Check Object Violations
+                obj_active, obj_triggered, obj_msg = st.session_state.violation_tracker.check_object_violation(
+                    obj_data, 
+                    persistence_time=2.0
+                )
+                
+                if obj_triggered:
+                    st.toast(obj_msg, icon="⚠️")
+                    
+                if obj_active:
+                     cv2.putText(frame, "WARNING: FORBIDDEN OBJECT!", (50, 400), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                     cv2.rectangle(frame, (0, 0), (frame.shape[1], frame.shape[0]), (0, 0, 255), 10)
+
                 if results.face_landmarks:
                     # Draw Mesh if enabled
                     if show_mesh:
@@ -254,6 +289,10 @@ def main():
 
 **Face Analysis**  
 - Faces Detected: {face_count} (Max: {config.thresholds.max_num_faces})
+
+**Object Analysis**
+- People Count: {obj_data.get('person_count', 0)}
+- Phone Detected: {obj_data.get('phone_detected', False)}
 """
 
                     if enable_head_pose:

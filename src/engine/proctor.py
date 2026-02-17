@@ -224,5 +224,59 @@ class ViolationTracker:
     def get_logs(self):
         return self.violations
 
+    def check_object_violation(self, object_data, persistence_time=2.0):
+        """
+        Check for object detection violations:
+        - cell phone detected
+        - multiple people detected (body)
+        
+        Returns: (is_active, is_triggered, message)
+        """
+        # 1. Phone Detection
+        if object_data.get('phone_detected', False):
+            # Check persistence
+             # Use a unique key for phone timer?
+             # Or reuse a generic object timer? Let's use specific.
+             if not hasattr(self, 'phone_start_time'):
+                 self.phone_start_time = None
+                 
+             if self.phone_start_time is None:
+                 self.phone_start_time = time.time()
+                 return False, False, ""
+             
+             elapsed = time.time() - self.phone_start_time
+             if elapsed >= persistence_time:
+                 msg = "Mobile Phone Detected!"
+                 is_triggered = False
+                 if self.log_violation(msg, violation_type='object_phone'):
+                     is_triggered = True
+                 return True, is_triggered, msg
+        else:
+            self.phone_start_time = None
+            
+        # 2. Person Count (Body) > 1
+        # The user said "apart from the user if someone else is wandering".
+        # So count > 1.
+        if object_data.get('person_count', 0) > 1:
+             if not hasattr(self, 'person_body_start_time'):
+                 self.person_body_start_time = None
+                 
+             if self.person_body_start_time is None:
+                 self.person_body_start_time = time.time()
+                 return False, False, ""
+             
+             elapsed = time.time() - self.person_body_start_time
+             if elapsed >= persistence_time:
+                 msg = f"Multiple People Detected (Body: {object_data['person_count']})"
+                 is_triggered = False
+                 # We use a different type than face count to distinguish
+                 if self.log_violation(msg, violation_type='object_multiple_people'):
+                     is_triggered = True
+                 return True, is_triggered, msg
+        else:
+            self.person_body_start_time = None
+            
+        return False, False, ""
+
     def get_violation_count(self):
         return len(self.violations)
