@@ -29,6 +29,16 @@ class ThresholdsConfig:
     multi_face_persistence_time: float = 3.0
     no_face_persistence_time: float = 3.0
     head_pose_persistence_time: float = 3.0
+    identity_check_interval_frames: int = 30
+    identity_persistence_time: float = 2.0
+
+@dataclass
+class GazeConfig:
+    horizontal_threshold_left: float = 0.35
+    horizontal_threshold_right: float = 0.65
+    vertical_threshold_up: float = 0.35
+    vertical_threshold_down: float = 0.65
+    smoothing_factor: float = 0.2
 
 class Config:
     def __init__(self, config_path: str = "src/configs/app.yaml"):
@@ -38,6 +48,7 @@ class Config:
         self.camera = CameraConfig(**self._config.get("camera", {}).get("params", {}))
         self.mediapipe = MediaPipeConfig(**self._config.get("mediapipe", {}))
         self.head_pose = HeadPoseConfig(**self._config.get("head_pose", {}))
+        self.gaze = GazeConfig(**self._config.get("gaze", {}))
         self.thresholds = ThresholdsConfig(**self._config.get("thresholds", {}))
 
     def _load_config(self) -> Dict[str, Any]:

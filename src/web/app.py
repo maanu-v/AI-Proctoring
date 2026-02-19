@@ -1,10 +1,14 @@
 import streamlit as st
 import cv2
+import numpy as np
 import tempfile
 import time
 import sys
 import os
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import base64
+from concurrent.futures import ThreadPoolExecutor
 from typing import Union
 
 # Add project root to path
@@ -14,6 +18,7 @@ from src.core.video_stream import VideoStream
 from src.engine.face.mesh_detector import MeshDetector
 from src.engine.face.head_pose import HeadPoseEstimator
 from src.engine.obj_detection.obj_detect import ObjectDetector
+from src.engine.face.face_embedding import FaceEmbedder
 from src.utils.config import config
 from src.utils.logger import get_logger
 
@@ -41,7 +46,24 @@ if "video_stream" not in st.session_state:
 
 if "violation_tracker" not in st.session_state:
     from src.engine.proctor import ViolationTracker
+if "violation_tracker" not in st.session_state:
+    from src.engine.proctor import ViolationTracker
     st.session_state.violation_tracker = ViolationTracker()
+    
+# Background Thread Executor
+if "executor" not in st.session_state:
+    st.session_state.executor = ThreadPoolExecutor(max_workers=1)
+if "identity_future" not in st.session_state:
+    st.session_state.identity_future = None
+    
+if "identity_violation_active" not in st.session_state:
+    st.session_state.identity_violation_active = False
+    st.session_state.identity_violation_msg = ""
+    st.session_state.identity_violation_msg = ""
+    st.session_state.identity_violation_triggered = False
+    st.session_state.identity_violation_start_time = 0
+if "identity_score" not in st.session_state:
+    st.session_state.identity_score = None
 
 @st.cache_resource
 def get_mesh_detector(num_faces):
@@ -64,12 +86,50 @@ def get_head_pose_estimator():
 def get_object_detector():
     return ObjectDetector()
 
+@st.cache_resource
+def get_face_embedder():
+    return FaceEmbedder(model_name="ArcFace")
+
 def main():
     detector = get_mesh_detector(config.mediapipe.num_faces)
     pose_estimator = get_head_pose_estimator()
     obj_detector = get_object_detector()
+    face_embedder = get_face_embedder()
     
+    # Session State for Reference Embedding
+    if "reference_embedding" not in st.session_state:
+        st.session_state.reference_embedding = None
+        
+    # Reference Image Uploader (Sidebar)
+    st.sidebar.markdown("### Identity Verification")
+    ref_image_file = st.sidebar.file_uploader("Upload Profile Image", type=['jpg', 'jpeg', 'png'])
+    
+    if ref_image_file:
+        # Convert to CV2 image
+        file_bytes = np.asarray(bytearray(ref_image_file.read()), dtype=np.uint8)
+        ref_image = cv2.imdecode(file_bytes, 1)
+        
+        if ref_image is not None:
+             # Compute embedding if not already set or changed
+             # Simple check: reuse embedding if file name same? 
+             # Streamlit re-runs, so we need to check if we already computed it for this file.
+             # We can't easily check file identity, but we can check if st.session_state.reference_embedding is None.
+             # Better: Compute once per upload. 
+             # Only recompute if filename changes? 
+             # Or just recompute now, it's one-time per run.
+             # BUT deepface is slow, so we should cache it.
+             
+             if "last_ref_image_name" not in st.session_state or st.session_state.last_ref_image_name != ref_image_file.name:
+                 with st.spinner("Computing Reference Embedding..."):
+                     st.session_state.reference_embedding = face_embedder.get_embedding(ref_image)
+                     st.session_state.last_ref_image_name = ref_image_file.name
+                     if st.session_state.reference_embedding:
+                         st.sidebar.success("Reference Embedding Set!")
+                     else:
+                         st.sidebar.error("No face detected in reference image!")
+        
     # Frame Counter for skipping object detection frames
+
     if "frame_count" not in st.session_state:
         st.session_state.frame_count = 0
     if "last_obj_data" not in st.session_state:
@@ -233,6 +293,73 @@ def main():
                 # 2. Object Detection (Every 30 frames ~ 1 sec)
                 if st.session_state.frame_count % 30 == 0:
                     st.session_state.last_obj_data = obj_detector.detect(frame)
+                    
+                    # 3. Identity Verification (Background Thread)
+                    # Check if previous task completed
+                    if st.session_state.identity_future is not None:
+                        if st.session_state.identity_future.done():
+                            try:
+                                is_match, score = st.session_state.identity_future.result()
+                                st.session_state.identity_future = None # Reset
+                                st.session_state.identity_score = score
+                                
+                                # Update Violation Tracker with result
+                                id_active, id_triggered, id_msg = st.session_state.violation_tracker.check_identity(
+                                    is_match, 
+                                    persistence_time=config.thresholds.identity_persistence_time
+                                )
+                                
+                                # Store result for continuous overlay (since check is infrequent)
+                                st.session_state.identity_violation_active = id_active
+                                st.session_state.identity_violation_msg = id_msg
+                                st.session_state.identity_violation_triggered = id_triggered
+                                
+                                if id_active:
+                                    st.session_state.identity_violation_start_time = time.time()
+                                
+                            except Exception as e:
+                                logger.error(f"Identity check future failed: {e}")
+                                st.session_state.identity_future = None
+
+                    # Trigger new check periodically
+                    if st.session_state.frame_count % config.thresholds.identity_check_interval_frames == 0:
+                        if st.session_state.reference_embedding is not None and st.session_state.identity_future is None:
+                             # Submit task to background thread
+                             # We copy frame to keep it safe? Actually deepface reads it. 
+                             # Frame is numpy array, passing it is fine (copy might happen or ref).
+                             # Use .copy() to be safe if frame is modified elsewhere.
+                             frame_copy = frame.copy()
+                             ref_emb = st.session_state.reference_embedding
+                             
+                             def run_verification(img, ref):
+                                 try:
+                                     # DeepFace might be slow, so this runs in thread
+                                     curr = face_embedder.get_embedding(img)
+                                     if curr is not None:
+                                         return face_embedder.compare_embeddings(ref, curr)
+                                     return True, 0.0 # Assume match if face not found to avoid false positive
+                                 except Exception as e:
+                                     logger.error(f"Error in verification thread: {e}")
+                                     return True, 0.0 # Fail safe
+
+                             st.session_state.identity_future = st.session_state.executor.submit(run_verification, frame_copy, ref_emb)
+                    
+                    # Display Violation Overlay (Persisted until next check clears it)
+                    if getattr(st.session_state, 'identity_violation_triggered', False):
+                        st.toast(st.session_state.identity_violation_msg, icon="🚫")
+                        st.session_state.identity_violation_triggered = False # Show toast once per trigger
+                        
+                    if getattr(st.session_state, 'identity_violation_active', False):
+                         # Show only for 10 seconds after detection
+                         if time.time() - getattr(st.session_state, 'identity_violation_start_time', 0) < 10:
+                             cv2.putText(frame, "IDENTITY VERIFICATION FAILED!", (50, 450), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                             cv2.rectangle(frame, (0, 0), (frame.shape[1], frame.shape[0]), (0, 0, 255), 10)
+                         else:
+                             # Expire the active state visually (stats will still show Mismatch until next check? 
+                             # User said "make the warning as overlay for 10 secs". 
+                             # We can keep the state "active" in background but hide overlay.
+                             pass
+
                 
                 obj_data = st.session_state.last_obj_data
                 
@@ -293,6 +420,10 @@ def main():
 **Object Analysis**
 - People Count: {obj_data.get('person_count', 0)}
 - Phone Detected: {obj_data.get('phone_detected', False)}
+
+**Identity Verification**
+- Status: {"Verified" if not getattr(st.session_state, 'identity_violation_active', False) else "Mismatch"}
+- Distance: {f"{st.session_state.identity_score:.4f}" if st.session_state.identity_score is not None else "N/A"} (Threshold: 0.68)
 """
 
                     if enable_head_pose:

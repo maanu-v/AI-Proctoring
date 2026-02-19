@@ -13,15 +13,22 @@ mediapipe:
   # Maximum number of faces MediaPipe will track simultaneously.
   num_faces: 5
 
+gaze:
+  horizontal_threshold_left: 0.35
+  horizontal_threshold_right: 0.65
+  vertical_threshold_up: 0.35
+  vertical_threshold_down: 0.65
+  smoothing_factor: 0.2
+
 head_pose:
   # Thresholds for head pose classification (in degrees).
   # Optimal values for proctoring to balance sensitivity and false positives:
   # Yaw: 30 (Allows looking at screen edges/dual monitors)
   # Pitch: 20 (Detects looking down at phone/notes but allows keyboard view)
   # Roll: 25 (Standard head tilt allowance)
-  yaw_threshold: 30
-  pitch_threshold: 20
-  roll_threshold: 25
+  yaw_threshold: 20
+  pitch_threshold: 15
+  roll_threshold: 20
   # Enable auto-calibration at startup to determine "forward" 0-point.
   auto_calibration: true
   # Seconds to calibrate.
@@ -38,3 +45,8 @@ thresholds:
   no_face_persistence_time: 2
   # Duration in seconds a head pose violation must persist to trigger a warning.
   head_pose_persistence_time: 3
+  # Interval in frames (at 30fps) to check identity. 30 = 1 sec, 3600 = 2 mins.
+  # Higher values save resources but delay detection.
+  identity_check_interval_frames: 30
+  # Duration in seconds identity mismatch must persist to trigger a warning.
+  identity_persistence_time: 2

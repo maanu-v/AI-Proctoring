@@ -11,4 +11,6 @@ dependencies = [
     "streamlit",
     "pyyaml",
     "ultralytics>=8.4.14",
+    "deepface",
+    "tf-keras",
 ]
