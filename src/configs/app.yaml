@@ -14,11 +14,22 @@ mediapipe:
   num_faces: 5
 
 gaze:
-  horizontal_threshold_left: 0.35
-  horizontal_threshold_right: 0.65
-  vertical_threshold_up: 0.35
-  vertical_threshold_down: 0.65
-  smoothing_factor: 0.2
+  # Tighter thresholds — iris movement is subtle (typical range ~0.35-0.55)
+  horizontal_threshold_left: 0.42
+  horizontal_threshold_right: 0.58
+  vertical_threshold_up: 0.40
+  vertical_threshold_down: 0.60
+  # Higher alpha = faster response to eye movement (0.2 was too slow)
+  smoothing_factor: 0.5
+
+blink:
+  # EAR threshold below which eyes are considered closed.
+  # Typical open-eye EAR is 0.25-0.35; closed is <0.20.
+  ear_threshold: 0.21
+  # Minimum consecutive frames eyes must be closed to count as a blink.
+  min_blink_frames: 2
+  # Seconds of continuous eye closure to flag as prolonged/suspicious.
+  long_closure_threshold: 1.0
 
 head_pose:
   # Thresholds for head pose classification (in degrees).
@@ -45,6 +56,8 @@ thresholds:
   no_face_persistence_time: 2
   # Duration in seconds a head pose violation must persist to trigger a warning.
   head_pose_persistence_time: 3
+  # Duration in seconds a gaze violation must persist to trigger a warning.
+  gaze_persistence_time: 2
   # Interval in frames (at 30fps) to check identity. 30 = 1 sec, 3600 = 2 mins.
   # Higher values save resources but delay detection.
   identity_check_interval_frames: 30

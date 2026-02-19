@@ -278,5 +278,79 @@ class ViolationTracker:
             
         return False, False, ""
 
+        return False, False, ""
+
+    def check_identity(self, is_verified, persistence_time=2.0):
+        """
+        Check for identity mismatch.
+        
+        Args:
+            is_verified (bool): True if identity matches or no reference set (safe). False if mismatch.
+            persistence_time (float): Time to wait before triggering violation.
+            
+        Returns: (is_active, is_triggered, message)
+        """
+        if is_verified:
+            # Identity confirmed or not checking
+            self.identity_start_time = None
+            return False, False, ""
+            
+        # Mismatch detected!
+        if not hasattr(self, 'identity_start_time') or self.identity_start_time is None:
+            self.identity_start_time = time.time()
+            return False, False, ""
+            
+        elapsed = time.time() - self.identity_start_time
+        if elapsed >= persistence_time:
+            msg = "Identity Verification Failed! Unknown Person Detected."
+            is_triggered = False
+            
+            if self.log_violation(msg, violation_type='identity_mismatch'):
+                is_triggered = True
+                
+            return True, is_triggered, msg
+            
+        return False, False, ""
+
     def get_violation_count(self):
         return len(self.violations)
+
+    def check_gaze_violation(self, direction, persistence_time=3.0):
+        """
+        Check for gaze violations (looking away from screen).
+        
+        Args:
+            direction (str): Current gaze direction.
+            persistence_time (float): Time to wait before triggering violation.
+            
+        Returns: (is_active, is_triggered, message)
+        """
+        if direction == "Center":
+            self.gaze_start_time = None
+            self.last_gaze_direction = None
+            return False, False, ""
+            
+        # Looking Away
+        if not hasattr(self, 'gaze_start_time') or self.gaze_start_time is None:
+            self.gaze_start_time = time.time()
+            self.last_gaze_direction = direction
+            return False, False, ""
+            
+        # If direction changed (e.g. Left -> Right), reset?
+        # Similar to head pose, we probably want to track specific direction
+        if direction != self.last_gaze_direction:
+            self.gaze_start_time = time.time()
+            self.last_gaze_direction = direction
+            return False, False, ""
+            
+        elapsed = time.time() - self.gaze_start_time
+        if elapsed >= persistence_time:
+            msg = f"Gaze Violation: Looking {direction} for {int(elapsed)} seconds."
+            is_triggered = False
+            
+            if self.log_violation(msg, violation_type=f'gaze_{direction}'):
+                is_triggered = True
+                
+            return True, is_triggered, msg
+            
+        return False, False, ""
