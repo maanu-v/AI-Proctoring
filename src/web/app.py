@@ -17,6 +17,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')
 from src.core.video_stream import VideoStream
 from src.engine.face.mesh_detector import MeshDetector
 from src.engine.face.head_pose import HeadPoseEstimator
+from src.engine.face.gaze_estimation import GazeEstimator
+from src.engine.face.blink_estimation import BlinkEstimator
 from src.engine.obj_detection.obj_detect import ObjectDetector
 from src.engine.face.face_embedding import FaceEmbedder
 from src.utils.config import config
@@ -33,6 +35,8 @@ st.sidebar.title("Settings")
 source_type = st.sidebar.radio("Video Source", ["Webcam", "Video File"])
 show_mesh = st.sidebar.checkbox("Show Face Mesh", value=True)
 enable_head_pose = st.sidebar.checkbox("Enable Head Pose Analysis", value=False)
+enable_gaze = st.sidebar.checkbox("Enable Gaze Estimation", value=False)
+enable_blink = st.sidebar.checkbox("Enable Blink Detection", value=False)
 
 st.sidebar.caption(f"System: Max Detectable Faces={config.mediapipe.num_faces}")
 st.sidebar.caption(f"Violation Threshold: > {config.thresholds.max_num_faces} faces")
@@ -83,6 +87,15 @@ def get_head_pose_estimator():
     )
 
 @st.cache_resource
+def get_gaze_estimator():
+    return GazeEstimator()
+
+@st.cache_resource
+def get_blink_estimator():
+    return BlinkEstimator()
+
+
+@st.cache_resource
 def get_object_detector():
     return ObjectDetector()
 
@@ -93,6 +106,8 @@ def get_face_embedder():
 def main():
     detector = get_mesh_detector(config.mediapipe.num_faces)
     pose_estimator = get_head_pose_estimator()
+    gaze_estimator = get_gaze_estimator()
+    blink_estimator = get_blink_estimator()
     obj_detector = get_object_detector()
     face_embedder = get_face_embedder()
     
@@ -224,6 +239,7 @@ def main():
                 if "calibration_start" not in st.session_state:
                     st.session_state.calibration_start = time.time()
                     st.session_state.calibration_data = {0: {'pitch': [], 'yaw': [], 'roll': []}} # Buffer for face 0
+                    st.session_state.gaze_calibration_data = {'h': [], 'v': []}
                     st.toast("Calibrating... Please look forward.", icon="🎯")
                 
                 elapsed = time.time() - st.session_state.calibration_start
@@ -237,25 +253,30 @@ def main():
                     # Collect Data
                     results = detector.process(frame, timestamp_ms)
                     if results.face_landmarks:
-                        # Use raw pose extraction (we haven't set offsets yet)
-                        # We need valid poses to average.
-                        # Note: pose_estimator.extract_pose ALREADY applies offsets if set.
-                        # Initial offsets are empty, so it returns raw-ish (smoothed) values.
+                        # Head Pose
                         poses = pose_estimator.extract_pose(results)
                         if poses:
-                            # Assume main face is index 0 for calibration
                             pose = poses[0]
                             st.session_state.calibration_data[0]['pitch'].append(pose['pitch'])
                             st.session_state.calibration_data[0]['yaw'].append(pose['yaw'])
                             st.session_state.calibration_data[0]['roll'].append(pose['roll'])
+                        
+                        # Gaze
+                        # Use raw estimate (without calibration offset yet)
+                        # We need the RATIOS, not the direction
+                        landmarks = results.face_landmarks[0]
+                        h, w, _ = frame.shape
+                        _, h_ratio, v_ratio = gaze_estimator.estimate_gaze(landmarks, w, h)
+                        st.session_state.gaze_calibration_data['h'].append(h_ratio)
+                        st.session_state.gaze_calibration_data['v'].append(v_ratio)
+
                             
-                            # Draw mesh/axes during calibration too?
-                            if show_mesh:
-                                frame = detector.draw_landmarks(frame, results)
-                            # Draw axes for visual feedback
-                            # ... (reuse drawing logic or just show overlay)
+                        # Draw mesh/axes during calibration too?
+                        if show_mesh:
+                            frame = detector.draw_landmarks(frame, results)
                 else:
                     # Finish Calibration
+                    # Head Pose
                     data = st.session_state.calibration_data[0]
                     if data['pitch']:
                         avg_pitch = sum(data['pitch']) / len(data['pitch'])
@@ -263,7 +284,17 @@ def main():
                         avg_roll = sum(data['roll']) / len(data['roll'])
                         
                         pose_estimator.set_calibration_offsets(0, avg_pitch, avg_yaw, avg_roll)
-                        logger.info(f"Calibration Complete. Offsets: P={avg_pitch:.1f}, Y={avg_yaw:.1f}, R={avg_roll:.1f}")
+                        logger.info(f"Head Pose Calibrated: P={avg_pitch:.1f}, Y={avg_yaw:.1f}, R={avg_roll:.1f}")
+                    
+                    # Gaze
+                    gaze_data = st.session_state.gaze_calibration_data
+                    if gaze_data['h']:
+                        avg_h = sum(gaze_data['h']) / len(gaze_data['h'])
+                        avg_v = sum(gaze_data['v']) / len(gaze_data['v'])
+                        gaze_estimator.set_calibration(avg_h, avg_v)
+                        logger.info(f"Gaze Calibrated: H={avg_h:.2f}, V={avg_v:.2f}")
+
+                    if data['pitch'] or gaze_data['h']:
                         st.toast("Calibration Complete!", icon="✅")
                     else:
                         st.warning("Calibration failed: No face detected.")
@@ -272,6 +303,7 @@ def main():
                     # Clean up
                     del st.session_state.calibration_start
                     del st.session_state.calibration_data
+                    del st.session_state.gaze_calibration_data
                     
                 # Skip normal processing loop during calibration?
                 # Yes, to avoid triggering violations while calibrating.
@@ -459,7 +491,59 @@ def main():
                                      
                                  if hp_active:
                                      cv2.putText(frame, f"WARNING: {direction.upper()}!", (50, 100 + i*50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                                     cv2.putText(frame, f"WARNING: {direction.upper()}!", (50, 100 + i*50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
                                      cv2.rectangle(frame, (0, 0), (frame.shape[1], frame.shape[0]), (0, 0, 255), 10)
+                    
+                    if enable_gaze:
+                        stats_markdown += "\n**Gaze Estimation**\n"
+                        # Estimate gaze for the first face (usually the user)
+                        # We need landmarks for the first face
+                        if results.face_landmarks:
+                            landmarks = results.face_landmarks[0]
+                            h, w, _ = frame.shape
+                            gaze_dir, h_ratio, v_ratio = gaze_estimator.estimate_gaze(landmarks, w, h)
+                            
+                            stats_markdown += f"""
+**User Gaze**
+- Direction: {gaze_dir}
+- H-Ratio: {h_ratio:.2f}
+- V-Ratio: {v_ratio:.2f}
+"""
+                            # Check Gaze Violation
+                            g_active, g_triggered, g_msg = st.session_state.violation_tracker.check_gaze_violation(
+                                gaze_dir, config.thresholds.gaze_persistence_time
+                            )
+                            
+                            if g_triggered:
+                                st.toast(g_msg, icon="👀")
+                                
+                            if g_active:
+                                cv2.putText(frame, f"WARNING: LOOKING {gaze_dir.upper()}!", (50, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                                cv2.rectangle(frame, (0, 0), (frame.shape[1], frame.shape[0]), (0, 0, 255), 10)
+
+                    if enable_blink:
+                        if results.face_landmarks:
+                            landmarks = results.face_landmarks[0]
+                            h, w, _ = frame.shape
+                            is_blinking, ear_l, ear_r, ear_avg = blink_estimator.estimate_blink(landmarks, w, h)
+                            blink_features = blink_estimator.get_features()
+
+                            stats_markdown += f"""
+**Blink Detection**
+- EAR: {ear_avg:.3f} → Smoothed: {blink_features['ear_smoothed']:.3f} (Thresh: {blink_features['ear_threshold']:.3f})
+- Blinking: {"Yes 👁️" if is_blinking else "No"}
+- Blink Count: {blink_features['blink_count']}
+- Blink Rate: {blink_features['blink_rate']:.1f}/min
+- Avg Duration: {blink_features['avg_blink_duration']:.3f}s
+- Interval Variance: {blink_features['blink_interval_variance']:.4f}
+"""
+                            if blink_features['baseline_ear'] is not None:
+                                stats_markdown += f"- Baseline EAR: {blink_features['baseline_ear']:.4f}\n"
+
+                            if blink_features['long_closure_detected']:
+                                stats_markdown += "- ⚠️ **Prolonged Eye Closure Detected!**\n"
+                                cv2.putText(frame, "WARNING: EYES CLOSED!", (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+                                cv2.rectangle(frame, (0, 0), (frame.shape[1], frame.shape[0]), (0, 0, 255), 10)
                     
                     stats_placeholder.markdown(stats_markdown)
 

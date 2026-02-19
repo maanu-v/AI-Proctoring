@@ -38,6 +38,9 @@ class BlinkConfig:
     ear_threshold: float = 0.21
     min_blink_frames: int = 2
     long_closure_threshold: float = 1.0
+    smoothing_alpha: float = 0.4
+    calibration_duration: float = 5.0
+    calibration_ratio: float = 0.75
 
 @dataclass
 class GazeConfig:

@@ -30,6 +30,12 @@ blink:
   min_blink_frames: 2
   # Seconds of continuous eye closure to flag as prolonged/suspicious.
   long_closure_threshold: 1.0
+  # Exponential smoothing factor for EAR (0.0=no change, 1.0=no smoothing).
+  smoothing_alpha: 0.4
+  # Seconds to collect baseline EAR during adaptive threshold calibration.
+  calibration_duration: 5.0
+  # Adaptive threshold = baseline_ear * this ratio.
+  calibration_ratio: 0.75
 
 head_pose:
   # Thresholds for head pose classification (in degrees).
