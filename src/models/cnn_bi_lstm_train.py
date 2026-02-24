@@ -112,12 +112,16 @@ log = logging.getLogger("cnn_bilstm")
 
 def _load_model_config():
     """Load ModelConfig from app.yaml, falling back to dataclass defaults on error."""
+    import sys
+    _root = Path(__file__).resolve().parent.parent.parent
+    if str(_root) not in sys.path:
+        sys.path.insert(0, str(_root))
+        
     try:
-        # Resolve config relative to this file's repo root
-        _root = Path(__file__).resolve().parent.parent.parent
         from src.utils.config import Config
         return Config(str(_root / "src" / "configs" / "app.yaml")).model
-    except Exception:
+    except Exception as e:
+        log.warning(f"Failed to load app.yaml explicitly: {e}. Falling back to config defaults.")
         try:
             from src.utils.config import Config
             return Config().model
@@ -146,12 +150,12 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--model-path",
-        default=_cfg.model_path if _cfg else "models",
+        default=_cfg.model_path if _cfg else "data/models",
         help="Directory to save trained .keras model files",
     )
     p.add_argument(
         "--reports-path",
-        default=_cfg.reports_path if _cfg else "reports",
+        default=_cfg.reports_path if _cfg else "data/reports",
         help="Directory to save evaluation plots and metrics",
     )
     # ── Data pipeline ──────────────────────────────────────────────────────── #
