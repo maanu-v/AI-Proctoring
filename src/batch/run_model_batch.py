@@ -87,6 +87,17 @@ def _process_wrapper(args):
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
     
+    # Configure TensorFlow memory growth to avoid OOM across multiprocessing workers
+    import os
+    os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
+    
+    try:
+        import tensorflow as tf
+        for gpu in tf.config.list_physical_devices('GPU'):
+            tf.config.experimental.set_memory_growth(gpu, True)
+    except Exception as e:
+        logger.warning(f"Failed to configure TF memory growth: {e}")
+    
     from src.batch.model_video_processor import process_single_video
     
     try:
