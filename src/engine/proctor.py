@@ -278,8 +278,6 @@ class ViolationTracker:
             
         return False, False, ""
 
-        return False, False, ""
-
     def check_identity(self, is_verified, persistence_time=2.0):
         """
         Check for identity mismatch.
