@@ -118,6 +118,29 @@ def _process_wrapper(args):
         return subject_id, {"error": str(e)}
 
 
+def auto_select_gpu():
+    """Automatically finds the GPU with the most free memory and sets CUDA_VISIBLE_DEVICES."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=index,memory.free", "--format=csv,noheader,nounits"],
+            stdout=subprocess.PIPE, text=True, check=True
+        )
+        gpu_memory = []
+        for line in result.stdout.strip().split('\n'):
+            if not line: continue
+            idx, free_mem = line.split(',')
+            gpu_memory.append((int(idx.strip()), int(free_mem.strip())))
+            
+        if gpu_memory:
+            gpu_memory.sort(key=lambda x: x[1], reverse=True)
+            best_gpu = gpu_memory[0][0]
+            best_mem = gpu_memory[0][1]
+            os.environ["CUDA_VISIBLE_DEVICES"] = str(best_gpu)
+            logger.info(f"Auto-selected GPU {best_gpu} with {best_mem} MiB free memory.")
+    except Exception as e:
+        logger.warning(f"Failed to auto-select GPU: {e}. Falling back to default.")
+
 def run_batch(
     subjects: list = None,
     sample_rate: int = 3,
@@ -138,6 +161,10 @@ def run_batch(
     logger.info("=" * 60)
     logger.info("AI Proctoring — Batch Video Processor")
     logger.info("=" * 60)
+    
+    # Auto-select the emptiest GPU before spawning workers so they inherit the env var
+    if "CUDA_VISIBLE_DEVICES" not in os.environ:
+        auto_select_gpu()
     
     # Discover videos
     videos = discover_videos(DATABASE_DIR, subjects)
