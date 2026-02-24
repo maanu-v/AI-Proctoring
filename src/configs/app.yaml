@@ -69,3 +69,40 @@ thresholds:
   identity_check_interval_frames: 30
   # Duration in seconds identity mismatch must persist to trigger a warning.
   identity_persistence_time: 2
+
+model:
+  # ── Paths ────────────────────────────────────────────────────────────────
+  # Root folder containing subjectN directories of the OEP dataset.
+  dataset_path: "data/raw/database"
+  # Directory where extracted frames are cached between runs.
+  processed_path: "data/processed"
+  # Directory where trained .keras model files are saved.
+  model_path: "data/models"
+  # Directory where evaluation reports (plots, metrics) are saved.
+  reports_path: "data/reports"
+
+  # ── Data pipeline ────────────────────────────────────────────────────────
+  # Number of consecutive frames per sequence window fed to the BiLSTM.
+  sequence_length: 10
+  # Overlap fraction between sliding windows (0.0 = no overlap, 0.5 = 50%).
+  overlap: 0.5
+  # Fraction of subjects held out for the test split (subject-level, no leakage).
+  test_size: 0.2
+
+  # ── Training hyperparameters ─────────────────────────────────────────────
+  epochs: 50
+  batch_size: 8
+  # Initial Adam learning rate.
+  learning_rate: 0.0001
+  # EarlyStopping patience (epochs without val_accuracy improvement).
+  patience: 10
+  # ReduceLROnPlateau: reduce LR by this factor after `lr_patience` stale epochs.
+  lr_reduce_factor: 0.5
+  lr_patience: 5
+  # Minimum learning rate ReduceLROnPlateau will decay to.
+  min_lr: 0.0000001
+
+  # ── Inference ────────────────────────────────────────────────────────────
+  # Anomaly score threshold above which a clip is flagged as suspicious.
+  # (fraction of windows predicted as non-Normal behaviour)
+  anomaly_threshold: 0.3

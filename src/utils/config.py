@@ -50,6 +50,28 @@ class GazeConfig:
     vertical_threshold_down: float = 0.60
     smoothing_factor: float = 0.5
 
+@dataclass
+class ModelConfig:
+    # Paths
+    dataset_path: str = "data/raw/database"
+    processed_path: str = "data/processed"
+    model_path: str = "data/models"
+    reports_path: str = "data/reports"
+    # Data pipeline
+    sequence_length: int = 10
+    overlap: float = 0.5
+    test_size: float = 0.2
+    # Training hyperparameters
+    epochs: int = 50
+    batch_size: int = 8
+    learning_rate: float = 1e-4
+    patience: int = 10
+    lr_reduce_factor: float = 0.5
+    lr_patience: int = 5
+    min_lr: float = 1e-7
+    # Inference
+    anomaly_threshold: float = 0.3
+
 class Config:
     def __init__(self, config_path: str = "src/configs/app.yaml"):
         self.config_path = config_path
@@ -61,6 +83,7 @@ class Config:
         self.gaze = GazeConfig(**self._config.get("gaze", {}))
         self.blink = BlinkConfig(**self._config.get("blink", {}))
         self.thresholds = ThresholdsConfig(**self._config.get("thresholds", {}))
+        self.model = ModelConfig(**self._config.get("model", {}))
 
     def _load_config(self) -> Dict[str, Any]:
         try:

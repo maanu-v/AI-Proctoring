@@ -13,4 +13,7 @@ dependencies = [
     "ultralytics>=8.4.14",
     "deepface",
     "tf-keras",
+    "scikit-learn",
+    "pandas",
+    "matplotlib",
 ]
