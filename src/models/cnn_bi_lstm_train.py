@@ -602,6 +602,18 @@ def train(args: argparse.Namespace) -> None:
 
     log.info("X_train: %s | X_test: %s", X_train.shape, X_test.shape)
 
+    # ── Step 2b: Compute class weights (inverse frequency) ───────────────── #
+    # This compensates for the severe imbalance in the OEP dataset
+    # (e.g. Label 2 >> Labels 5, 6) so minority classes get higher loss weight.
+    counts = np.bincount(y_train, minlength=num_classes).astype(float)
+    counts = np.where(counts == 0, 1.0, counts)   # avoid division by zero
+    weights = counts.sum() / (num_classes * counts)
+    class_weight = {i: float(w) for i, w in enumerate(weights)}
+    reverse_map_log = {idx: orig for orig, idx in label_map.items()}
+    log.info("Class weights (model_idx → weight, orig_label):")
+    for idx, w in class_weight.items():
+        log.info("  [%d] Label %-3s  → %.4f", idx, reverse_map_log.get(idx, idx), w)
+
     # ── Step 3: Model ────────────────────────────────────────────────────── #
     model = build_cnn_bilstm(num_classes, args.sequence_length)
     model.summary(print_fn=log.info)
@@ -636,6 +648,7 @@ def train(args: argparse.Namespace) -> None:
         epochs=args.epochs,
         batch_size=args.batch_size,
         validation_data=(X_test, y_test),
+        class_weight=class_weight,
         callbacks=callbacks,
         verbose=1,
     )
