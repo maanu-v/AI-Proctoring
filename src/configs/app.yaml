@@ -99,8 +99,18 @@ model:
   # ReduceLROnPlateau: reduce LR by this factor after `lr_patience` stale epochs.
   lr_reduce_factor: 0.5
   lr_patience: 5
-  # Minimum learning rate ReduceLROnPlateau will decay to.
+  # Minimum learning rate to avoid plateauing at 0.
   min_lr: 0.0000001
+
+batch:
+  # Directory where subjectN folders are located
+  database_dir: "data/raw/database"
+  # Directory to save processed JSON and video outputs
+  output_dir: "data/model_processing/results"
+  # Number of parallel video processing workers
+  max_workers: 2
+  # Process every Nth frame (if applicable to the pipeline)
+  sample_rate: 3
 
   # ── Inference ────────────────────────────────────────────────────────────
   # Anomaly score threshold above which a clip is flagged as suspicious.

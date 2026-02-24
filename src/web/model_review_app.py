@@ -478,7 +478,7 @@ def render_dashboard(index_data):
             # Violation type breakdown
             vtype_html = ""
             for vt, count in sorted(vtypes.items(), key=lambda x: x[1], reverse=True)[:3]:
-                display_vt = vt.replace("Label_", "Class ")
+                display_vt = f"Class {vt}"
                 vtype_html += f'<span class="violation-type-badge">{display_vt}: {count}</span> '
             
             st.markdown(f"""
@@ -660,12 +660,12 @@ def render_review(subject_id: str):
             msg = v.get("message", "")
             
             colors = {
-                "Label_1": "#3b82f6",
-                "Label_2": "#38bdf8",
-                "Label_3": "#ef4444",
-                "Label_4": "#f59e0b",
-                "Label_5": "#2dd4bf",
-                "Label_6": "#f97316",
+                "1": "#3b82f6",
+                "2": "#38bdf8",
+                "3": "#ef4444",
+                "4": "#f59e0b",
+                "5": "#2dd4bf",
+                "6": "#f97316",
             }
             color = colors.get(vtype, "#ef4444")
             tooltip = f"{msg} : {format_time(v['start_time'])} → {format_time(v['end_time'])} ({v.get('duration', 0):.1f}s)"
@@ -706,7 +706,7 @@ def render_review(subject_id: str):
             sev = v.get("severity", "medium")
             html_template += f"""
             <div class="violation-row" onclick="seekVideo({v['start_time']})">
-                <span class="violation-type-badge">{vtype.replace("Label_", "Class ")}</span>
+                <span class="violation-type-badge">Class {vtype}</span>
                 <span class="violation-time">{format_time(v['start_time'])} → {format_time(v['end_time'])}</span>
                 <span class="violation-msg">{v.get('message', '')}</span>
                 <span class="violation-severity sev-{sev}">{sev}</span>
@@ -749,7 +749,7 @@ def render_review(subject_id: str):
                 st.markdown(f"""
                 <div style="margin-bottom:10px;">
                     <div style="display:flex;justify-content:space-between;color:rgba(255,255,255,0.7);font-size:0.85rem;margin-bottom:4px;">
-                        <span>{vtype.replace('Label_', 'Class ')}</span>
+                        <span>Class {vtype}</span>
                         <span>{count} ({pct:.0f}%)</span>
                     </div>
                     <div style="background:rgba(255,255,255,0.05);border-radius:4px;height:6px;overflow:hidden;">

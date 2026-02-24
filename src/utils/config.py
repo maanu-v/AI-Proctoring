@@ -69,8 +69,14 @@ class ModelConfig:
     lr_reduce_factor: float = 0.5
     lr_patience: int = 5
     min_lr: float = 1e-7
-    # Inference
     anomaly_threshold: float = 0.3
+
+@dataclass
+class BatchConfig:
+    database_dir: str = "data/raw/database"
+    output_dir: str = "data/model_processing/results"
+    max_workers: int = 2
+    sample_rate: int = 3
 
 class Config:
     def __init__(self, config_path: str = "src/configs/app.yaml"):
@@ -84,6 +90,7 @@ class Config:
         self.blink = BlinkConfig(**self._config.get("blink", {}))
         self.thresholds = ThresholdsConfig(**self._config.get("thresholds", {}))
         self.model = ModelConfig(**self._config.get("model", {}))
+        self.batch = BatchConfig(**self._config.get("batch", {}))
 
     def _load_config(self) -> Dict[str, Any]:
         try:

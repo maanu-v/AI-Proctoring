@@ -27,14 +27,7 @@ logger = logging.getLogger(__name__)
 
 def parse_ground_truth(gt_path: str) -> List[Dict[str, Any]]:
     """Parse a ground truth file (gt.txt)."""
-    cheating_type_labels = {
-        1: "Looking at notes/book",
-        2: "Looking at phone/device",
-        3: "Talking to someone",
-        4: "Passing notes",
-        5: "Using unauthorized materials",
-        6: "Other suspicious behavior",
-    }
+
     
     ground_truth = []
     if not os.path.exists(gt_path):
@@ -60,7 +53,7 @@ def parse_ground_truth(gt_path: str) -> List[Dict[str, Any]]:
                         "start_str": f"{int(start_str[:2])}:{start_str[2:]}",
                         "end_str": f"{int(end_str[:2])}:{end_str[2:]}",
                         "type": cheat_type,
-                        "type_label": cheating_type_labels.get(cheat_type, f"Unknown ({cheat_type})")
+                        "type_label": str(cheat_type)
                     })
     except Exception as e:
         logger.error(f"Error parsing ground truth {gt_path}: {e}")
@@ -149,8 +142,8 @@ def process_single_video(
         confidence = w["confidence"]
         
         # In OEP, the provided GT only has cheating behaviors. So if predict_clip detects it, it's a violation.
-        vtype = f"Label_{lbl}"
-        msg = f"{w['class_name']} ({confidence:.0%} conf)"
+        vtype = str(lbl)
+        msg = f"Class {lbl} ({confidence:.0%} conf)"
         
         if current_segment is None:
             current_segment = {
@@ -165,7 +158,7 @@ def process_single_video(
             # Continue segment if same label and gap is small
             current_segment["end_time"] = end_t
             current_segment["confidences"].append(confidence)
-            current_segment["message"] = f"{w['class_name']} (avg conf: {sum(current_segment['confidences'])/len(current_segment['confidences']):.0%})"
+            current_segment["message"] = f"Class {lbl} (avg conf: {sum(current_segment['confidences'])/len(current_segment['confidences']):.0%})"
         else:
             # Save segment and start a new one
             current_segment["duration"] = current_segment["end_time"] - current_segment["start_time"]
@@ -241,7 +234,7 @@ def process_single_video(
                     text_color = (0, 255, 0) # Green text (Normal)
                 
                 # Draw text background
-                text = f"CNN-BiLSTM: {name} ({conf:.0%})"
+                text = f"Class {lbl} ({conf:.0%})"
                 (text_w, text_h), baseline = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)
                 overlay = annotated_frame.copy()
                 cv2.rectangle(overlay, (10, height - text_h - 30), (10 + text_w + 20, height - 10), (0, 0, 0), -1)

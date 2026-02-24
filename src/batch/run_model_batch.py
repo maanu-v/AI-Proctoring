@@ -35,8 +35,10 @@ PROJECT_ROOT = str(Path(__file__).resolve().parents[2])
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-DATABASE_DIR = os.path.join(PROJECT_ROOT, "data", "raw", "database")
-OUTPUT_DIR = os.path.join(PROJECT_ROOT, "data", "model_processing", "results")
+from src.utils.config import config
+
+DATABASE_DIR = os.path.join(PROJECT_ROOT, config.batch.database_dir)
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, config.batch.output_dir)
 
 
 def discover_videos(database_dir: str, subjects: list = None) -> list:
@@ -111,9 +113,13 @@ def run_batch(
     
     Args:
         subjects: List of subject IDs to process (None = all)
-        sample_rate: Process every Nth frame
-        max_workers: Number of parallel workers
+        sample_rate: Process every Nth frame (defaults to config)
+        max_workers: Number of parallel workers (defaults to config)
     """
+    if max_workers is None:
+        max_workers = config.batch.max_workers
+    if sample_rate is None:
+        sample_rate = config.batch.sample_rate
     logger.info("=" * 60)
     logger.info("AI Proctoring — Batch Video Processor")
     logger.info("=" * 60)
@@ -274,12 +280,12 @@ def main():
         help="Specific subject IDs to process (e.g., subject1 subject2). Default: all."
     )
     parser.add_argument(
-        "--sample-rate", type=int, default=3,
-        help="Process every Nth frame. Default: 3."
+        "--sample-rate", type=int, default=None,
+        help="Process every Nth frame. Default: from config.yaml."
     )
     parser.add_argument(
-        "--max-workers", type=int, default=2,
-        help="Number of parallel workers. Default: 2."
+        "--max-workers", type=int, default=None,
+        help="Number of parallel workers. Default: from config.yaml."
     )
     
     args = parser.parse_args()
