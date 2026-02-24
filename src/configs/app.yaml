@@ -102,6 +102,11 @@ model:
   # Minimum learning rate to avoid plateauing at 0.
   min_lr: 0.0000001
 
+  # ── Inference ────────────────────────────────────────────────────────────
+  # Anomaly score threshold above which a clip is flagged as suspicious.
+  # (fraction of windows predicted as non-Normal behaviour)
+  anomaly_threshold: 0.3
+
 batch:
   # Directory where subjectN folders are located
   database_dir: "data/raw/database"
@@ -111,8 +116,3 @@ batch:
   max_workers: 2
   # Process every Nth frame (if applicable to the pipeline)
   sample_rate: 3
-
-  # ── Inference ────────────────────────────────────────────────────────────
-  # Anomaly score threshold above which a clip is flagged as suspicious.
-  # (fraction of windows predicted as non-Normal behaviour)
-  anomaly_threshold: 0.3
