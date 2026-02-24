@@ -100,6 +100,9 @@ def _process_wrapper(args):
     
     from src.batch.model_video_processor import process_single_video
     
+    import multiprocessing
+    worker_id = multiprocessing.current_process()._identity[0] if multiprocessing.current_process()._identity else 0
+    
     try:
         result = process_single_video(
             video_path=video_path,
@@ -107,6 +110,7 @@ def _process_wrapper(args):
             gt_path=gt_path,
             output_dir=output_dir,
             sample_rate=sample_rate,
+            worker_id=worker_id,
         )
         return subject_id, result
     except Exception as e:

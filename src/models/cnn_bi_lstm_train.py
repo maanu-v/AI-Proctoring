@@ -852,7 +852,10 @@ def predict_clip(
     model: "tf.keras.Model",
     video_path: str,
     metadata: dict,
+    desc: str = "Inference",
+    position: int = 0,
 ) -> dict:
+    from tqdm import tqdm
     """
     Runs inference on a video clip and returns per-window and aggregated
     predictions suitable for consumption by the proctoring engine.
@@ -885,12 +888,17 @@ def predict_clip(
         raise IOError(f"Cannot open video: {video_path}")
 
     frames: list[np.ndarray] = []
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    
+    pbar = tqdm(total=total_frames, desc=f"{desc} (Extract)", position=position, leave=False)
     while True:
         ret, frame = cap.read()
         if not ret:
             break
         frame = cv2.resize(frame, (w, h)).astype(np.float32) / 255.0
         frames.append(frame)
+        pbar.update(1)
+    pbar.close()
     cap.release()
 
     if len(frames) < seq_len:
@@ -905,7 +913,20 @@ def predict_clip(
         window_info.append((start, start + seq_len - 1))
 
     X = np.array(windows_data, dtype=np.float32)      # (W, T, H, W, 3)
-    probs = model.predict(X, verbose=0)                # (W, num_classes)
+    
+    # Run inference in batches to show progress
+    batch_size = 32
+    probs_list = []
+    
+    pbar = tqdm(total=len(X), desc=f"{desc} (Predict)", position=position, leave=False)
+    for i in range(0, len(X), batch_size):
+        batch = X[i : i + batch_size]
+        batch_probs = model.predict(batch, verbose=0)
+        probs_list.append(batch_probs)
+        pbar.update(len(batch))
+    pbar.close()
+    
+    probs = np.vstack(probs_list)
     pred_indices = np.argmax(probs, axis=1)
 
     results = []

@@ -67,6 +67,7 @@ def process_single_video(
     gt_path: str,
     output_dir: str,
     sample_rate: int = 3, # Note: sample_rate is ignored here because predict_clip handles extraction
+    worker_id: int = 0,
 ) -> Dict[str, Any]:
     """
     Process a single video file using the trained CNN-BiLSTM model.
@@ -88,7 +89,11 @@ def process_single_video(
 
     # 1. Run inference for the entire clip using the CNN-BiLSTM
     try:
-        prediction_results = predict_clip(model, video_path, metadata)
+        prediction_results = predict_clip(
+            model, video_path, metadata, 
+            desc=f"[{subject_id}] AI", 
+            position=worker_id
+        )
     except Exception as e:
         logger.error(f"[{subject_id}] Failed during inference: {e}")
         return {"error": f"Inference failed: {e}"}
@@ -204,9 +209,12 @@ def process_single_video(
         ffmpeg_proc = None
 
     frame_idx = 0
+    from tqdm import tqdm
+    pbar = tqdm(total=total_frames, desc=f"[{subject_id}] Vid (Overlay)", position=worker_id, leave=False)
+    
     if ffmpeg_proc:
         while True:
-            ret, frame = cap.read()
+            ret, cap_frame = cap.read()
             if not ret:
                 break
                 
@@ -215,7 +223,7 @@ def process_single_video(
             # Find active prediction for this frame
             active_preds = [w for w in windows if w["start_frame"] <= frame_idx <= w["end_frame"]]
             
-            annotated_frame = frame.copy()
+            annotated_frame = cap_frame.copy()
             if active_preds:
                 # Use the window that is most centered on this frame, or just the first overlapping one
                 active_pred = active_preds[0]
@@ -251,6 +259,9 @@ def process_single_video(
                 break
                 
             frame_idx += 1
+            pbar.update(1)
+            
+    pbar.close()
 
     cap.release()
     if ffmpeg_proc:
