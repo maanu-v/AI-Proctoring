@@ -87,16 +87,6 @@ except ImportError as e:
     print("Install via: pip install tensorflow scikit-learn pandas matplotlib opencv-python")
     sys.exit(1)
 
-# --------------------------------------------------------------------------- #
-# Global constants                                                             #
-# --------------------------------------------------------------------------- #
-CLASS_NAMES = {
-    0: "Normal",
-    1: "Gaze Away",
-    2: "Using Device",
-    3: "Talking",
-    4: "Multiple People",
-}
 
 IMG_SIZE = (224, 224)  # MobileNetV2 input
 FRAME_SAMPLE_RATE = 5  # extract every Nth frame from a segment
@@ -368,40 +358,61 @@ def build_sequences(
     subject_filter: Optional[list[str]],
     sequence_length: int,
     overlap: float,
-) -> tuple[np.ndarray, np.ndarray, int]:
+    label_map: Optional[dict] = None,
+) -> tuple[np.ndarray, np.ndarray, int, dict]:
     """
     Builds (X, y) arrays from extracted frames.
 
     Args:
-        frames_dir: Directory with class_<N>/ subdirectories.
-        subject_filter: If given, only include frames from these subjects.
+        frames_dir:      Directory with class_<N>/ subdirectories.
+        subject_filter:  If given, only include frames from these subjects.
         sequence_length: Number of frames per sequence.
-        overlap: Fractional overlap between consecutive windows (0 … <1).
+        overlap:         Fractional overlap between consecutive windows (0 … <1).
+        label_map:       {original_label_int -> model_index}.  If None (first
+                         call on train data), the map is built from labels present
+                         in frames_dir.  Pass the train map when building test
+                         sequences so both use the same encoding.
 
     Returns:
-        X: float32 array of shape (N, T, H, W, 3), normalised to [0, 1]
-        y: int32 array of shape (N,) with class indices
-        num_classes: number of distinct classes found
+        X:          float32 array  (N, T, H, W, 3), normalised to [0, 1]
+        y:          int32 array    (N,) — model-index encoded (0-based)
+        num_classes: number of distinct classes
+        label_map:  {original_label: model_index}  (same one that was passed in,
+                    or the newly built one)
     """
     stride = max(1, int(sequence_length * (1 - overlap)))
     X_list, y_list = [], []
 
-    class_dirs = sorted([d for d in frames_dir.iterdir() if d.is_dir() and d.name.startswith("class_")])
+    class_dirs = sorted([
+        d for d in frames_dir.iterdir()
+        if d.is_dir() and d.name.startswith("class_")
+    ])
 
-    all_labels = []
+    # Discover original labels from directory names
+    discovered_labels = []
     for cd in class_dirs:
         try:
-            all_labels.append(int(cd.name.split("_")[1]))
+            discovered_labels.append(int(cd.name.split("_")[1]))
         except (ValueError, IndexError):
             pass
-    num_classes = max(all_labels) + 1 if all_labels else 0
+
+    # Build label_map on first call (train); reuse on second call (test)
+    if label_map is None:
+        label_map = {orig: idx for idx, orig in enumerate(sorted(discovered_labels))}
+
+    num_classes = len(label_map)
 
     for class_dir in class_dirs:
         try:
-            label = int(class_dir.name.split("_")[1])
+            orig_label = int(class_dir.name.split("_")[1])
         except (ValueError, IndexError):
             continue
 
+        if orig_label not in label_map:
+            log.warning("Label %d in test data not seen during training — skipping.", orig_label)
+            continue
+
+        model_label = label_map[orig_label]
         images = sorted(class_dir.glob("*.jpg"))
 
         # Filter by subject
@@ -435,16 +446,17 @@ def build_sequences(
 
                 if valid:
                     X_list.append(np.array(seq_frames, dtype=np.float32))
-                    y_list.append(label)
+                    y_list.append(model_label)
 
     if not X_list:
-        return np.array([]), np.array([]), num_classes
+        return np.array([]), np.array([]), num_classes, label_map
 
     X = np.array(X_list, dtype=np.float32)   # (N, T, H, W, 3)
     y = np.array(y_list, dtype=np.int32)
-    log.info("Sequences: %s | Classes: %d | Label dist: %s",
-             X.shape, num_classes, dict(zip(*np.unique(y, return_counts=True))))
-    return X, y, num_classes
+    label_dist = {f"Label {k}": int(v) for k, v in
+                  zip(label_map.keys(), np.bincount(y, minlength=num_classes))}
+    log.info("Sequences: %s | Classes: %d | Dist: %s", X.shape, num_classes, label_dist)
+    return X, y, num_classes, label_map
 
 
 # =========================================================================== #
@@ -575,12 +587,13 @@ def train(args: argparse.Namespace) -> None:
 
     # ── Step 2: Build sequences ──────────────────────────────────────────── #
     log.info("Building training sequences …")
-    X_train, y_train, num_classes = build_sequences(
+    X_train, y_train, num_classes, label_map = build_sequences(
         processed_path, subjects_train, args.sequence_length, args.overlap
     )
     log.info("Building test sequences …")
-    X_test, y_test, _ = build_sequences(
-        processed_path, subjects_test, args.sequence_length, args.overlap
+    X_test, y_test, _, _ = build_sequences(
+        processed_path, subjects_test, args.sequence_length, args.overlap,
+        label_map=label_map,   # reuse training map so indices match
     )
 
     if X_train.size == 0 or X_test.size == 0:
@@ -633,7 +646,10 @@ def train(args: argparse.Namespace) -> None:
     log.info("Final model saved → %s", final_model_path)
 
     # ── Step 7: Evaluate ─────────────────────────────────────────────────── #
-    class_names = [CLASS_NAMES.get(i, f"class_{i}") for i in range(num_classes)]
+    # Build human-readable class names from the discovered label_map
+    # e.g., {1:0, 2:1, 3:2, 5:3, 6:4}  →  ["Label 1", "Label 2", ...]
+    reverse_map = {idx: orig for orig, idx in label_map.items()}
+    class_names = [f"Label {reverse_map[i]}" for i in range(num_classes)]
     metrics = evaluate(model, X_test, y_test, class_names, reports_dir)
 
     # ── Step 8: Plot training history ─────────────────────────────────────── #
@@ -644,6 +660,9 @@ def train(args: argparse.Namespace) -> None:
         "trained_at": datetime.now(timezone.utc).isoformat(),
         "num_classes": num_classes,
         "class_names": class_names,
+        # label_map: original dataset label → model output index
+        # e.g. {"1": 0, "2": 1, "3": 2, "5": 3, "6": 4}
+        "label_map": {str(k): v for k, v in label_map.items()},
         "sequence_length": args.sequence_length,
         "input_shape": [*IMG_SIZE, 3],
         "overlap": args.overlap,
@@ -847,11 +866,15 @@ def predict_clip(
           "anomaly_score":  fraction of windows NOT labelled "Normal",
         }
     """
-    seq_len    = metadata.get("sequence_length", 10)
-    class_names = metadata.get("class_names", list(CLASS_NAMES.values()))
-    h, w       = metadata.get("input_shape", [224, 224, 3])[:2]
-    overlap    = metadata.get("overlap", 0.5)
-    stride     = max(1, int(seq_len * (1 - overlap)))
+    seq_len     = metadata.get("sequence_length", 10)
+    class_names = metadata.get("class_names", [])   # e.g. ["Label 1", "Label 2", ...]
+    # label_map stored as {"1": 0, "2": 1, ...} (JSON keys are strings)
+    label_map_raw = metadata.get("label_map", {})
+    # reverse: model_index -> original_label_int
+    rev_label = {v: int(k) for k, v in label_map_raw.items()}
+    h, w        = metadata.get("input_shape", [224, 224, 3])[:2]
+    overlap     = metadata.get("overlap", 0.5)
+    stride      = max(1, int(seq_len * (1 - overlap)))
 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -883,14 +906,19 @@ def predict_clip(
 
     results = []
     for i, (start_f, end_f) in enumerate(window_info):
-        cls_idx = int(pred_indices[i])
+        model_idx = int(pred_indices[i])
+        orig_lbl  = rev_label.get(model_idx, model_idx)  # original dataset label
+        name      = class_names[model_idx] if model_idx < len(class_names) else f"Label {orig_lbl}"
         results.append({
-            "start_frame":     start_f,
-            "end_frame":       end_f,
-            "predicted_class": cls_idx,
-            "class_name":      class_names[cls_idx] if cls_idx < len(class_names) else f"class_{cls_idx}",
-            "confidence":      float(probs[i, cls_idx]),
-            "all_probs":       {class_names[j]: float(probs[i, j]) for j in range(len(class_names))},
+            "start_frame":      start_f,
+            "end_frame":        end_f,
+            "predicted_label":  orig_lbl,   # original integer from dataset
+            "class_name":       name,
+            "confidence":       float(probs[i, model_idx]),
+            "all_probs":        {
+                class_names[j] if j < len(class_names) else f"Label {rev_label.get(j,j)}": float(probs[i, j])
+                for j in range(probs.shape[1])
+            },
         })
 
     # Aggregate
@@ -900,8 +928,8 @@ def predict_clip(
     summary = {k: round(v / total, 4) for k, v in name_counts.items()}
     dominant = max(summary, key=summary.get) if summary else None
 
-    # anomaly = fraction of windows where predicted class != "Normal"
-    normal_name = class_names[0] if class_names else "Normal"
+    # anomaly = fraction of windows where model index != 0 (lowest/normal label)
+    normal_name = class_names[0] if class_names else ""
     anomaly_score = round(1.0 - summary.get(normal_name, 0.0), 4)
 
     return {

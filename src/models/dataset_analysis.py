@@ -247,7 +247,7 @@ def print_summary(df: pd.DataFrame, meta: dict) -> None:
 
 # Generate a consistent colour palette from the labels found in the data
 def _make_palette(labels: list[int]) -> dict[int, str]:
-    cmap = plt.cm.get_cmap("tab10", len(labels))
+    cmap = matplotlib.colormaps.get_cmap("tab10").resampled(len(labels))
     return {lbl: cmap(i) for i, lbl in enumerate(labels)}
 
 
