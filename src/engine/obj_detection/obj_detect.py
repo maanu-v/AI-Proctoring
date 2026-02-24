@@ -1,7 +1,12 @@
 import cv2
 import time
 import logging
-from ultralytics import YOLO
+from ultralytics import YOLO, settings as yolo_settings
+
+# Suppress Ultralytics startup banners in multiprocessing workers
+yolo_settings.update({"sync": False})
+import ultralytics.utils as _ult_utils
+_ult_utils.LOGGER.setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 

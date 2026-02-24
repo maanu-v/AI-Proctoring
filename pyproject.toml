@@ -13,4 +13,6 @@ dependencies = [
     "ultralytics>=8.4.14",
     "deepface",
     "tf-keras",
+    "imageio-ffmpeg>=0.6.0",
+    "tqdm>=4.67.3",
 ]
