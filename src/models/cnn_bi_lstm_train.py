@@ -101,6 +101,7 @@ try:
             print(f"Failed to configure TF memory limits: {e}")
 
     from tensorflow.keras.models import Sequential, load_model
+    from tensorflow.keras.utils import Sequence
     from tensorflow.keras.layers import (
         Dense,
         Dropout,
@@ -454,14 +455,14 @@ def build_sequences(
                          sequences so both use the same encoding.
 
     Returns:
-        X:          float32 array  (N, T, H, W, 3), normalised to [0, 1]
+        X_paths:    list of lists of paths (N, sequence_length)
         y:          int32 array    (N,) — model-index encoded (0-based)
         num_classes: number of distinct classes
         label_map:  {original_label: model_index}  (same one that was passed in,
                     or the newly built one)
     """
     stride = max(1, int(sequence_length * (1 - overlap)))
-    X_list, y_list = [], []
+    X_paths, y_list = [], []
 
     class_dirs = sorted([
         d for d in frames_dir.iterdir()
@@ -514,29 +515,60 @@ def build_sequences(
                 if len(seq_paths) < sequence_length:
                     break
 
-                seq_frames = []
-                valid = True
-                for p in seq_paths:
-                    img = cv2.imread(str(p))
-                    if img is None:
-                        valid = False
-                        break
-                    img = cv2.resize(img, IMG_SIZE).astype(np.float32) / 255.0
-                    seq_frames.append(img)
-
-                if valid:
-                    X_list.append(np.array(seq_frames, dtype=np.float32))
+                if len(seq_paths) == sequence_length:
+                    X_paths.append(seq_paths)
                     y_list.append(model_label)
 
-    if not X_list:
-        return np.array([]), np.array([]), num_classes, label_map
+    if not X_paths:
+        return [], np.array([]), num_classes, label_map
 
-    X = np.array(X_list, dtype=np.float32)   # (N, T, H, W, 3)
     y = np.array(y_list, dtype=np.int32)
     label_dist = {f"Label {k}": int(v) for k, v in
                   zip(label_map.keys(), np.bincount(y, minlength=num_classes))}
-    log.info("Sequences: %s | Classes: %d | Dist: %s", X.shape, num_classes, label_dist)
-    return X, y, num_classes, label_map
+    log.info("Sequences: %d | Classes: %d | Dist: %s", len(X_paths), num_classes, label_dist)
+    return X_paths, y, num_classes, label_map
+
+
+class VideoSequenceGenerator(Sequence):
+    """
+    Reads batches of images from disk on the fly to prevent OOM errors.
+    """
+    def __init__(self, x_paths: list[list[Path]], y: np.ndarray, batch_size: int, img_size: tuple[int, int] = IMG_SIZE, shuffle: bool = True):
+        self.x_paths = x_paths
+        self.y = y
+        self.batch_size = batch_size
+        self.img_size = img_size
+        self.shuffle = shuffle
+        self.indexes = np.arange(len(self.x_paths))
+        if self.shuffle:
+            np.random.shuffle(self.indexes)
+
+    def __len__(self) -> int:
+        return int(np.ceil(len(self.x_paths) / self.batch_size))
+
+    def __getitem__(self, index: int) -> tuple[np.ndarray, np.ndarray]:
+        batch_indexes = self.indexes[index * self.batch_size:(index + 1) * self.batch_size]
+
+        batch_x_paths = [self.x_paths[k] for k in batch_indexes]
+        batch_y = self.y[batch_indexes]
+
+        X_batch = []
+        for seq_paths in batch_x_paths:
+            seq_frames = []
+            for p in seq_paths:
+                img = cv2.imread(str(p))
+                if img is None:
+                    img = np.zeros((*self.img_size, 3), dtype=np.float32)
+                else:
+                    img = cv2.resize(img, self.img_size).astype(np.float32) / 255.0
+                seq_frames.append(img)
+            X_batch.append(seq_frames)
+
+        return np.array(X_batch, dtype=np.float32), batch_y
+
+    def on_epoch_end(self):
+        if self.shuffle:
+            np.random.shuffle(self.indexes)
 
 
 # =========================================================================== #
@@ -666,21 +698,24 @@ def train(args: argparse.Namespace) -> None:
     log.info("Test  subjects (%d): %s", len(subjects_test),  subjects_test)
 
     # ── Step 2: Build sequences ──────────────────────────────────────────── #
-    log.info("Building training sequences …")
-    X_train, y_train, num_classes, label_map = build_sequences(
+    log.info("Building training sequences metadata…")
+    X_train_paths, y_train, num_classes, label_map = build_sequences(
         processed_path, subjects_train, args.sequence_length, args.overlap
     )
-    log.info("Building test sequences …")
-    X_test, y_test, _, _ = build_sequences(
+    log.info("Building test sequences metadata…")
+    X_test_paths, y_test, _, _ = build_sequences(
         processed_path, subjects_test, args.sequence_length, args.overlap,
         label_map=label_map,   # reuse training map so indices match
     )
 
-    if X_train.size == 0 or X_test.size == 0:
+    if len(X_train_paths) == 0 or len(X_test_paths) == 0:
         log.error("Sequence building returned empty arrays — check your data.")
         sys.exit(1)
 
-    log.info("X_train: %s | X_test: %s", X_train.shape, X_test.shape)
+    log.info("X_train sequences: %d | X_test sequences: %d", len(X_train_paths), len(X_test_paths))
+    
+    train_gen = VideoSequenceGenerator(X_train_paths, y_train, args.batch_size, shuffle=True)
+    test_gen  = VideoSequenceGenerator(X_test_paths, y_test, args.batch_size, shuffle=False)
 
     # ── Step 3: Model ────────────────────────────────────────────────────── #
     model = build_cnn_bilstm(num_classes, args.sequence_length)
@@ -712,10 +747,9 @@ def train(args: argparse.Namespace) -> None:
     # ── Step 5: Training loop ─────────────────────────────────────────────── #
     log.info("Starting training: %d epochs, batch=%d", args.epochs, args.batch_size)
     history = model.fit(
-        X_train, y_train,
+        train_gen,
         epochs=args.epochs,
-        batch_size=args.batch_size,
-        validation_data=(X_test, y_test),
+        validation_data=test_gen,
         callbacks=callbacks,
         verbose=1,
     )
@@ -730,7 +764,7 @@ def train(args: argparse.Namespace) -> None:
     # e.g., {1:0, 2:1, 3:2, 5:3, 6:4}  →  ["Label 1", "Label 2", ...]
     reverse_map = {idx: orig for orig, idx in label_map.items()}
     class_names = [f"Label {reverse_map[i]}" for i in range(num_classes)]
-    metrics = evaluate(model, X_test, y_test, class_names, reports_dir)
+    metrics = evaluate(model, test_gen, y_test, class_names, reports_dir)
 
     # ── Step 8: Plot training history ─────────────────────────────────────── #
     plot_training_history(history, reports_dir)
@@ -771,14 +805,14 @@ def train(args: argparse.Namespace) -> None:
 
 def evaluate(
     model: "tf.keras.Model",
-    X_test: np.ndarray,
+    test_gen: "tf.keras.utils.Sequence",
     y_test: np.ndarray,
     class_names: list[str],
     out_dir: Path,
 ) -> dict:
     """Full evaluation suite: metrics, confusion matrix, classification report."""
     log.info("Evaluating model …")
-    y_pred_prob = model.predict(X_test, verbose=0)
+    y_pred_prob = model.predict(test_gen, verbose=0)
     y_pred = np.argmax(y_pred_prob, axis=1)
     y_true = y_test  # already integer indices (sparse)
 
