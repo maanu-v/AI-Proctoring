@@ -118,24 +118,8 @@ def process_single_video(
     violation_segments = []
     normal_label_index = 0 # As per our label_map (1 is mapped to 0, which is normal? Actually 0 might be whatever label is lowest. In OEP dataset, 1 is looking around. Wait, no. The dataset doesn't have 0. Let's look at the label map.)
     
-    # We define any label other than the lowest original label as a violation.
-    label_map_raw = metadata.get("label_map", {})
-    # reverse: model_index -> original_label_int
-    rev_label = {v: int(k) for k, v in label_map_raw.items()}
-    # find the minimum original label (usually 1 or 0)
-    normal_orig_label = min(rev_label.values()) if rev_label else 2  # default to 2 if something goes wrong, wait, in OEP, 2 is normal?? Let's check below.
-
-    # Wait, the Kaggle notebook mapped 0: Normal, 1: Gaze Away. In our dataset analysis:
-    # 2 is the most common label, and 1, 3, 5, 6 are rare.
-    # Label 2 = Looking at phone? Wait, let's look at parse_ground_truth labels:
-    # 1 = Looking at notes/book
-    # 2 = Looking at phone/device
-    # So 2 is a violation. What is normal? Normal frames are NOT in gt.txt! 
-    # Actually wait. `build_sequences` builds the labels from the folder names created by `extract_frames_for_subject`.
-    # `extract_frames_for_subject` only extracts frames based on gt.txt.
-    # If a frame is NOT in gt.txt, it's not extracted as normal?
-    # No, wait. We need to be careful about what is normal. 
-    # For now, let's just group contiguous identical predictions as segments.
+    # We define any label other than 0 as a violation.
+    normal_orig_label = 0
 
     current_segment = None
 

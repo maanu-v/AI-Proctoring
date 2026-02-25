@@ -307,16 +307,33 @@ def extract_frames_for_subject(
     fps = cap.get(cv2.CAP_PROP_FPS)
     log.info("[%s] Video: %d frames @ %.1f FPS", subject_dir, total_frames, fps)
 
-    # Create class directories
-    for label in gt_df["Label"].unique():
+    # Create class directories including Class 0 (Normal)
+    classes_to_extract = set(gt_df["Label"].unique())
+    classes_to_extract.add(0)
+    for label in classes_to_extract:
         (output_dir / f"class_{label}").mkdir(parents=True, exist_ok=True)
 
+    # Compile non-overlapping gap ranges for Class 0 (Normal)
+    # The video starts at 0 and ends at total_frames
+    normal_segments = []
+    current_time = 0
+    
+    # Ensure anomalies are sorted by start time
+    gt_df = gt_df.sort_values(by="Start")
+    
     for _, row in gt_df.iterrows():
         start, end, label = int(row["Start"]), int(row["End"]), int(row["Label"])
         if start >= total_frames:
             continue
         end = min(end, total_frames - 1)
-
+        
+        # If there's a gap between the current time and the start of this violation
+        if start > current_time:
+            normal_segments.append((current_time, start - 1))
+            
+        current_time = max(current_time, end + 1)
+        
+        # Extract violation frames
         cap.set(cv2.CAP_PROP_POS_FRAMES, start)
         for frame_idx in range(start, end + 1, FRAME_SAMPLE_RATE):
             ret, frame = cap.read()
@@ -325,6 +342,21 @@ def extract_frames_for_subject(
             frame = cv2.resize(frame, IMG_SIZE)
             out_fname = f"{subject_dir}_lbl{label}_f{frame_idx:06d}.jpg"
             cv2.imwrite(str(output_dir / f"class_{label}" / out_fname), frame)
+
+    # Add any remaining time at the end of the video as normal
+    if current_time < total_frames:
+        normal_segments.append((current_time, total_frames - 1))
+        
+    # Extract Normal (Class 0) frames from the gaps
+    for start, end in normal_segments:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, start)
+        for frame_idx in range(start, end + 1, FRAME_SAMPLE_RATE):
+            ret, frame = cap.read()
+            if not ret:
+                break
+            frame = cv2.resize(frame, IMG_SIZE)
+            out_fname = f"{subject_dir}_lbl0_f{frame_idx:06d}.jpg"
+            cv2.imwrite(str(output_dir / "class_0" / out_fname), frame)
 
     cap.release()
     log.info("[%s] Frame extraction complete.", subject_dir)
@@ -879,6 +911,10 @@ def predict_clip(
     label_map_raw = metadata.get("label_map", {})
     # reverse: model_index -> original_label_int
     rev_label = {v: int(k) for k, v in label_map_raw.items()}
+    
+    # Ensure Class 0 (Normal) is explicitly handled if class_names is missing
+    normal_orig_label = 0
+    
     h, w        = metadata.get("input_shape", [224, 224, 3])[:2]
     overlap     = metadata.get("overlap", 0.5)
     stride      = max(1, int(seq_len * (1 - overlap)))
@@ -953,9 +989,9 @@ def predict_clip(
     summary = {k: round(v / total, 4) for k, v in name_counts.items()}
     dominant = max(summary, key=summary.get) if summary else None
 
-    # anomaly = fraction of windows where model index != 0 (lowest/normal label)
-    normal_name = class_names[0] if class_names else ""
-    anomaly_score = round(1.0 - summary.get(normal_name, 0.0), 4)
+    # anomaly = fraction of windows where predicted label != 0 (Class 0 / Normal)
+    anomaly_fraction = sum(1 for r in results if r["predicted_label"] != normal_orig_label) / max(1, len(results))
+    anomaly_score = round(anomaly_fraction, 4)
 
     return {
         "windows":        results,

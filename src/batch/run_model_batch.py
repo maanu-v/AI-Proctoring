@@ -90,11 +90,18 @@ def _process_wrapper(args):
     # Configure TensorFlow memory growth to avoid OOM across multiprocessing workers
     import os
     os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
+    os.environ["TF_XLA_FLAGS"] = "--tf_xla_enable_xla_devices=false"
     
     try:
         import tensorflow as tf
-        for gpu in tf.config.list_physical_devices('GPU'):
+        gpus = tf.config.list_physical_devices('GPU')
+        for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
+            # Add a strict upper bound memory limit to prevent XLA/BFC allocator from grabbing everything
+            tf.config.set_logical_device_configuration(
+                gpu,
+                [tf.config.LogicalDeviceConfiguration(memory_limit=10240)] # Max 10GB per worker
+            )
     except Exception as e:
         logger.warning(f"Failed to configure TF memory growth: {e}")
     

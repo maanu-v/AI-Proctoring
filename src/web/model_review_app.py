@@ -660,12 +660,13 @@ def render_review(subject_id: str):
             msg = v.get("message", "")
             
             colors = {
-                "1": "#3b82f6",
-                "2": "#38bdf8",
-                "3": "#ef4444",
-                "4": "#f59e0b",
-                "5": "#2dd4bf",
-                "6": "#f97316",
+                "0": "#22c55e", # Green (Normal)
+                "1": "#8b5cf6", # Violet
+                "2": "#3b82f6", # Blue
+                "3": "#ef4444", # Red
+                "4": "#f59e0b", # Amber
+                "5": "#2dd4bf", # Teal
+                "6": "#f97316", # Orange
             }
             color = colors.get(vtype, "#ef4444")
             tooltip = f"{msg} : {format_time(v['start_time'])} → {format_time(v['end_time'])} ({v.get('duration', 0):.1f}s)"
@@ -675,14 +676,21 @@ def render_review(subject_id: str):
         for gt in ground_truth:
             left = (gt["start_time"] / duration) * 100
             width = max(((gt["end_time"] - gt["start_time"]) / duration) * 100, 0.5)
+            gt_type = str(gt.get("type", "unknown"))
+            color = colors.get(gt_type, "#f59e0b")
             tooltip = f"GT: {gt['type_label']} ({gt['start_str']} → {gt['end_str']})"
-            gt_segments_html += f'<div class="timeline-segment gt" onclick="seekVideo({gt["start_time"]})" style="left:{left:.2f}%;width:{width:.2f}%;" title="{tooltip}"></div>'
+            gt_segments_html += f'<div class="timeline-segment gt" onclick="seekVideo({gt["start_time"]})" style="left:{left:.2f}%;width:{width:.2f}%;background:{color};" title="{tooltip}"></div>'
             
         html_template += f"""
         <div class="timeline-container">
-            <div class="legend">
-                <div class="legend-item"><span class="legend-dot" style="background:#ef4444;"></span> Model Detected Violation</div>
-                <div class="legend-item"><span class="legend-dot" style="background:#f59e0b;"></span> Ground Truth Box</div>
+            <div class="legend" style="display:flex;gap:15px;flex-wrap:wrap;margin-bottom:10px;">
+                <div class="legend-item"><span class="legend-dot" style="background:#22c55e;"></span> Class 0 (Normal)</div>
+                <div class="legend-item"><span class="legend-dot" style="background:#8b5cf6;"></span> Class 1</div>
+                <div class="legend-item"><span class="legend-dot" style="background:#3b82f6;"></span> Class 2</div>
+                <div class="legend-item"><span class="legend-dot" style="background:#ef4444;"></span> Class 3</div>
+                <div class="legend-item"><span class="legend-dot" style="background:#f59e0b;"></span> Class 4</div>
+                <div class="legend-item"><span class="legend-dot" style="background:#2dd4bf;"></span> Class 5</div>
+                <div class="legend-item"><span class="legend-dot" style="background:#f97316;"></span> Class 6</div>
             </div>
             <p style="color:rgba(255,255,255,0.5);font-size:0.75rem;margin:8px 0 2px 0;">▼ Detected Violations (Click to Seek)</p>
             <div class="timeline-bar">{violation_segments_html}</div>
