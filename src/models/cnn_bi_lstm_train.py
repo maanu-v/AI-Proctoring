@@ -52,10 +52,54 @@ matplotlib.use("Agg")  # headless — no display needed on server
 import matplotlib.pyplot as plt
 
 # --------------------------------------------------------------------------- #
+# Resource Management
+# --------------------------------------------------------------------------- #
+if __name__ == "__main__":
+    def auto_select_gpu():
+        import subprocess, os
+        try:
+            result = subprocess.run(
+                ["nvidia-smi", "--query-gpu=index,memory.free", "--format=csv,noheader,nounits"],
+                stdout=subprocess.PIPE, text=True, check=True
+            )
+            gpu_memory = []
+            for line in result.stdout.strip().split('\n'):
+                if not line: continue
+                idx, free_mem = line.split(',')
+                gpu_memory.append((int(idx.strip()), int(free_mem.strip())))
+                
+            if gpu_memory:
+                gpu_memory.sort(key=lambda x: x[1], reverse=True)
+                best_gpu = gpu_memory[0][0]
+                os.environ["CUDA_VISIBLE_DEVICES"] = str(best_gpu)
+                print(f"Auto-selected GPU {best_gpu} with {gpu_memory[0][1]} MiB free memory for training.")
+        except Exception as e:
+            print(f"Failed to auto-select GPU: {e}")
+
+    if "CUDA_VISIBLE_DEVICES" not in os.environ:
+        auto_select_gpu()
+
+    os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
+    os.environ["TF_XLA_FLAGS"] = "--tf_xla_enable_xla_devices=false"
+
+# --------------------------------------------------------------------------- #
 # Lazy TF import so the script can be imported without TF installed            #
 # --------------------------------------------------------------------------- #
 try:
     import tensorflow as tf
+    
+    if __name__ == "__main__":
+        try:
+            gpus = tf.config.list_physical_devices('GPU')
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+                tf.config.set_logical_device_configuration(
+                    gpu,
+                    [tf.config.LogicalDeviceConfiguration(memory_limit=30000)] # Cap at 30GB to prevent total memory exhaustion
+                )
+        except Exception as e:
+            print(f"Failed to configure TF memory limits: {e}")
+
     from tensorflow.keras.models import Sequential, load_model
     from tensorflow.keras.layers import (
         Dense,
