@@ -16,6 +16,7 @@ router = APIRouter(prefix="/api/session", tags=["Settings"])
 
 @router.get("/{session_id}/settings")
 async def get_session_settings(
+    session_id: str,
     session: QuizSession = Depends(get_session)
 ):
     """Get current settings for a session"""
@@ -24,6 +25,7 @@ async def get_session_settings(
 
 @router.put("/{session_id}/settings")
 async def update_session_settings(
+    session_id: str,
     settings: SettingsUpdateRequest,
     session: QuizSession = Depends(get_session)
 ):
@@ -39,7 +41,7 @@ async def update_session_settings(
         # Update session settings
         session.update_settings(update_data)
         
-        logger.info(f"Updated settings for session: {update_data}")
+        logger.info(f"Updated settings for session {session_id}: {update_data}")
         
         return {
             "message": "Settings updated successfully",

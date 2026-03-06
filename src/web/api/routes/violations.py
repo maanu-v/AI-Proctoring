@@ -29,6 +29,7 @@ async def get_violations(
 
 @router.delete("/{session_id}/violations")
 async def clear_violations(
+    session_id: str,
     session: QuizSession = Depends(get_session)
 ):
     """
@@ -38,7 +39,7 @@ async def clear_violations(
     """
     try:
         session.clear_violations()
-        logger.info("Violations cleared for session")
+        logger.info(f"Violations cleared for session {session_id}")
         
         return MessageResponse(message="Violations cleared successfully")
         

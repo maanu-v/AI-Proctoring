@@ -7,6 +7,8 @@ from datetime import datetime
 import sys
 import os
 import logging
+import time
+import numpy as np
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../..')))
 
@@ -20,6 +22,23 @@ from src.utils.config import config
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/analyze", tags=["Frame Analysis"])
+
+
+def convert_to_native(obj):
+    """Convert numpy types to Python native types for JSON serialization"""
+    if isinstance(obj, (np.bool_, bool)):
+        return bool(obj)
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {key: convert_to_native(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_to_native(item) for item in obj]
+    return obj
 
 
 @router.post("/frame/{session_id}", response_model=AnalysisResult)
@@ -62,11 +81,16 @@ async def analyze_frame(
         # ====================================================================
         face_count = 0
         landmarks = None
+        mesh_result = None
         
         if session.settings["enable_face_detection"]:
-            result = analyzers["mesh"].detect(frame)
-            face_count = result["face_count"]
-            landmarks = result["landmarks"]
+            # Use MediaPipe's process method with timestamp
+            timestamp_ms = int(time.time() * 1000)
+            mesh_result = analyzers["mesh"].process(frame, timestamp_ms)
+            
+            # Extract face count and landmarks from MediaPipe result
+            face_count = len(mesh_result.face_landmarks) if mesh_result.face_landmarks else 0
+            landmarks = mesh_result.face_landmarks if mesh_result.face_landmarks else None
             
             analysis_result["face_detection"] = {
                 "face_count": face_count,
@@ -110,47 +134,64 @@ async def analyze_frame(
         # ====================================================================
         # Head Pose Analysis
         # ====================================================================
-        if session.settings["enable_head_pose"] and landmarks is not None and len(landmarks) > 0:
-            pose_result = analyzers["head_pose"].estimate_pose(frame, landmarks[0])
-            direction = pose_result["direction"]
+        if session.settings["enable_head_pose"] and mesh_result is not None and landmarks is not None and len(landmarks) > 0:
+            # Extract poses from MediaPipe result
+            poses = analyzers["head_pose"].extract_pose(mesh_result)
             
-            analysis_result["head_pose"] = {
-                "direction": direction,
-                "yaw": pose_result["yaw"],
-                "pitch": pose_result["pitch"],
-                "roll": pose_result["roll"]
-            }
-            
-            # Check violations
-            hp_active, hp_triggered, hp_msg = session.violation_tracker.check_head_pose(
-                direction,
-                persistence_time=config.thresholds.head_pose_persistence_time
-            )
-            
-            if hp_active:
-                warnings.append(hp_msg)
-                if hp_triggered:
-                    violations.append({
-                        "type": "head_pose",
-                        "message": hp_msg,
-                        "timestamp": datetime.now().isoformat()
-                    })
+            if poses and len(poses) > 0:
+                pose = poses[0]  # Use first face
+                direction = analyzers["head_pose"].classify_direction(pose)
+                
+                # Check if looking forward
+                is_looking_forward = (
+                    abs(pose["yaw"]) <= config.head_pose.yaw_threshold and
+                    abs(pose["pitch"]) <= config.head_pose.pitch_threshold
+                )
+                
+                analysis_result["head_pose"] = {
+                    "direction": direction,
+                    "yaw": float(pose["yaw"]),
+                    "pitch": float(pose["pitch"]),
+                    "roll": float(pose["roll"]),
+                    "is_looking_forward": is_looking_forward
+                }
+                
+                # Check violations
+                hp_active, hp_triggered, hp_msg = session.violation_tracker.check_head_pose(
+                    direction,
+                    persistence_time=config.thresholds.head_pose_persistence_time
+                )
+                
+                if hp_active:
+                    warnings.append(hp_msg)
+                    if hp_triggered:
+                        violations.append({
+                            "type": "head_pose",
+                            "message": hp_msg,
+                            "timestamp": datetime.now().isoformat()
+                        })
         
         # ====================================================================
         # Gaze Tracking
         # ====================================================================
         if session.settings["enable_gaze"] and landmarks is not None and len(landmarks) > 0:
-            gaze_result = analyzers["gaze"].estimate_gaze(frame, landmarks[0])
+            # Get frame dimensions
+            h, w = frame.shape[:2]
+            direction, horizontal_ratio, vertical_ratio = analyzers["gaze"].estimate_gaze(landmarks[0], w, h)
+            
+            # Check if looking at screen (direction is "Center" or close to it)
+            is_looking_at_screen = direction == "Center"
             
             analysis_result["gaze"] = {
-                "direction": gaze_result["direction"],
-                "left_iris": gaze_result["left_iris"],
-                "right_iris": gaze_result["right_iris"]
+                "direction": direction,
+                "horizontal_ratio": float(horizontal_ratio),
+                "vertical_ratio": float(vertical_ratio),
+                "is_looking_at_screen": is_looking_at_screen
             }
             
             # Check violations
             gaze_active, gaze_triggered, gaze_msg = session.violation_tracker.check_gaze_violation(
-                gaze_result["direction"],
+                direction,
                 persistence_time=config.thresholds.gaze_persistence_time
             )
             
@@ -167,17 +208,23 @@ async def analyze_frame(
         # Blink Detection
         # ====================================================================
         if session.settings["enable_blink"] and landmarks is not None and len(landmarks) > 0:
-            blink_result = analyzers["blink"].detect_blink(landmarks[0])
+            # Get frame dimensions
+            h, w = frame.shape[:2]
+            is_blinking, ear_left, ear_right, ear_avg = analyzers["blink"].estimate_blink(landmarks[0], w, h)
+            
+            # Get total blinks from the estimator
+            blink_features = analyzers["blink"].get_features()
             
             analysis_result["blink"] = {
-                "ear": blink_result["ear"],
-                "blink_detected": blink_result["blink_detected"],
-                "eyes_closed": blink_result["eyes_closed"],
-                "blink_count": blink_result["blink_count"]
+                "ear": float(ear_avg),
+                "ear_left": float(ear_left),
+                "ear_right": float(ear_right),
+                "eyes_closed": bool(is_blinking),
+                "total_blinks": int(blink_features.get("total_blinks", 0))
             }
             
             # Check for prolonged eye closure
-            if blink_result.get("prolonged_closure", False):
+            if blink_features.get("prolonged_closure_detected", False):
                 warnings.append("Prolonged eye closure detected")
         
         # ====================================================================
@@ -186,10 +233,19 @@ async def analyze_frame(
         if session.settings["enable_object_detection"]:
             obj_result = analyzers["object"].detect(frame)
             
+            # Format detections for response
+            formatted_detections = []
+            for box, class_name, conf in obj_result.get("detections", []):
+                formatted_detections.append({
+                    "class": class_name,
+                    "confidence": float(conf),
+                    "box": [float(x) for x in box]
+                })
+            
             analysis_result["object_detection"] = {
                 "phone_detected": obj_result.get("phone_detected", False),
                 "person_count": obj_result.get("person_count", 0),
-                "objects": obj_result.get("detections", [])
+                "objects": formatted_detections
             }
             
             # Check violations
@@ -217,20 +273,21 @@ async def analyze_frame(
                     current_embedding = analyzers["embedder"].get_embedding(frame)
                     
                     if current_embedding is not None:
-                        is_verified = analyzers["embedder"].compare_embeddings(
+                        is_match, distance = analyzers["embedder"].compare_embeddings(
                             session.reference_embedding,
                             current_embedding,
                             threshold=0.68
                         )
                         
                         analysis_result["identity_verification"] = {
-                            "verified": is_verified,
-                            "checked_at_frame": session.frame_count
+                            "match": bool(is_match),
+                            "distance": float(distance),
+                            "checked_at_frame": int(session.frame_count)
                         }
                         
                         # Check violations
                         id_active, id_triggered, id_msg = session.violation_tracker.check_identity(
-                            is_verified,
+                            is_match,
                             persistence_time=config.thresholds.identity_persistence_time
                         )
                         
@@ -246,6 +303,10 @@ async def analyze_frame(
         # ====================================================================
         # Return Analysis Result
         # ====================================================================
+        # Convert all numpy types to native Python types for JSON serialization
+        analysis_result = convert_to_native(analysis_result)
+        violations = convert_to_native(violations)
+        
         return AnalysisResult(
             session_id=session_id,
             frame_count=session.frame_count,

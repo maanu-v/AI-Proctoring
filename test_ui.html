@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Proctoring System - Test UI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 30px;
+        }
+
+        .panel {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .panel h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .panel h3 {
+            color: #764ba2;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        video {
+            width: 100%;
+            border-radius: 10px;
+            background: #000;
+            margin-bottom: 15px;
+        }
+
+        canvas {
+            display: none;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .status.success {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .status.warning {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .status.error {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .results {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .result-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .violation-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-left: 4px solid #f5576c;
+            background: #fff5f5;
+            border-radius: 4px;
+        }
+
+        .toggle-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .toggle-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .toggle-item label {
+            margin: 0;
+            font-weight: 500;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 26px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.4s;
+            border-radius: 26px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #667eea;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .session-info {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .session-info p {
+            margin: 5px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .session-info strong {
+            color: #667eea;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .analyzing {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-left: 5px;
+        }
+
+        .badge.success {
+            background: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .badge.warning {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+
+        .badge.error {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .scrollable {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #764ba2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎓 AI Proctoring System</h1>
+            <p>Comprehensive Testing Interface for FastAPI Backend</p>
+        </div>
+
+        <div class="main-content">
+            <!-- Left Column: Session & Video -->
+            <div>
+                <!-- Session Management -->
+                <div class="panel">
+                    <h2>📋 Session Management</h2>
+                    
+                    <div id="sessionStatus" class="status info">
+                        No active session
+                    </div>
+
+                    <div id="sessionInfo" class="session-info" style="display: none;">
+                        <p><strong>Session ID:</strong> <span id="sessionId">-</span></p>
+                        <p><strong>Student ID:</strong> <span id="studentId">-</span></p>
+                        <p><strong>Quiz ID:</strong> <span id="quizId">-</span></p>
+                        <p><strong>Status:</strong> <span id="sessionState">-</span></p>
+                    </div>
+
+                    <div id="sessionCreate">
+                        <div class="form-group">
+                            <label>Student ID</label>
+                            <input type="text" id="inputStudentId" placeholder="e.g., STU12345" value="STU12345">
+                        </div>
+                        <div class="form-group">
+                            <label>Quiz ID</label>
+                            <input type="text" id="inputQuizId" placeholder="e.g., QUIZ001" value="QUIZ001">
+                        </div>
+                        <div class="form-group">
+                            <label>Profile Image (Optional)</label>
+                            <input type="file" id="inputProfileImage" accept="image/*">
+                        </div>
+                        <button onclick="createSession()">Create Session</button>
+                    </div>
+
+                    <div id="sessionActive" style="display: none;">
+                        <button class="btn-danger" onclick="endSession()">End Session</button>
+                    </div>
+                </div>
+
+                <!-- Video Feed -->
+                <div class="panel">
+                    <h2>📹 Video Feed</h2>
+                    
+                    <video id="video" autoplay playsinline></video>
+                    <canvas id="canvas"></canvas>
+                    
+                    <button id="cameraBtn" onclick="toggleCamera()">Start Camera</button>
+                    <button id="analyzeBtn" onclick="toggleAnalysis()" disabled style="margin-top: 10px;">Start Analysis</button>
+
+                    <div class="stats" style="margin-top: 20px;">
+                        <div class="stat-card">
+                            <div class="stat-value" id="fpsCounter">0</div>
+                            <div class="stat-label">FPS</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="frameCounter">0</div>
+                            <div class="stat-label">Frames</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Results & Settings -->
+            <div>
+                <!-- Analysis Results -->
+                <div class="panel">
+                    <h2>📊 Analysis Results</h2>
+                    
+                    <div class="stats">
+                        <div class="stat-card">
+                            <div class="stat-value" id="faceCount">-</div>
+                            <div class="stat-label">Faces</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="headPoseStatus">-</div>
+                            <div class="stat-label">Head Pose</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="gazeStatus">-</div>
+                            <div class="stat-label">Gaze</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="objectCount">-</div>
+                            <div class="stat-label">Objects</div>
+                        </div>
+                    </div>
+
+                    <h3>Latest Analysis</h3>
+                    <div id="analysisResults" class="results scrollable">
+                        <p style="color: #999; text-align: center;">Start analysis to see results</p>
+                    </div>
+
+                    <h3>Violations</h3>
+                    <div id="violationsList" class="results scrollable">
+                        <p style="color: #999; text-align: center;">No violations detected</p>
+                    </div>
+
+                    <button class="btn-secondary" onclick="clearViolations()" style="margin-top: 10px;">Clear Violations</button>
+                </div>
+            </div>
+
+            <!-- Settings Panel (Full Width) -->
+            <div class="panel full-width">
+                <h2>⚙️ Session Settings</h2>
+                
+                <div class="toggle-group">
+                    <div class="toggle-item">
+                        <label>No Face Detection</label>
+                        <label class="switch">
+                            <input type="checkbox" id="settingNoFace" onchange="updateSettings()" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-item">
+                        <label>Multiple Face Detection</label>
+                        <label class="switch">
+                            <input type="checkbox" id="settingMultiFace" onchange="updateSettings()" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-item">
+                        <label>Head Pose Detection</label>
+                        <label class="switch">
+                            <input type="checkbox" id="settingHeadPose" onchange="updateSettings()" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-item">
+                        <label>Gaze Detection</label>
+                        <label class="switch">
+                            <input type="checkbox" id="settingGaze" onchange="updateSettings()" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-item">
+                        <label>Object Detection</label>
+                        <label class="switch">
+                            <input type="checkbox" id="settingObject" onchange="updateSettings()" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-item">
+                        <label>Identity Verification</label>
+                        <label class="switch">
+                            <input type="checkbox" id="settingIdentity" onchange="updateSettings()" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Configuration Panel (Full Width) -->
+            <div class="panel full-width">
+                <h2>🔧 Global Configuration</h2>
+                
+                <h3>Head Pose Thresholds</h3>
+                <div class="config-grid">
+                    <div class="form-group">
+                        <label>Max Yaw (degrees)</label>
+                        <input type="number" id="configYaw" value="30" step="5">
+                    </div>
+                    <div class="form-group">
+                        <label>Max Pitch (degrees)</label>
+                        <input type="number" id="configPitch" value="20" step="5">
+                    </div>
+                </div>
+
+                <h3>Gaze Thresholds</h3>
+                <div class="config-grid">
+                    <div class="form-group">
+                        <label>Max Horizontal Deviation</label>
+                        <input type="number" id="configGazeH" value="0.3" step="0.05">
+                    </div>
+                    <div class="form-group">
+                        <label>Max Vertical Deviation</label>
+                        <input type="number" id="configGazeV" value="0.2" step="0.05">
+                    </div>
+                </div>
+
+                <h3>Blink Detection</h3>
+                <div class="config-grid">
+                    <div class="form-group">
+                        <label>EAR Threshold</label>
+                        <input type="number" id="configEar" value="0.2" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label>Consecutive Frames</label>
+                        <input type="number" id="configBlinkFrames" value="2" step="1">
+                    </div>
+                </div>
+
+                <h3>Violation Persistence (seconds)</h3>
+                <div class="config-grid">
+                    <div class="form-group">
+                        <label>No Face Duration</label>
+                        <input type="number" id="configNoFaceDuration" value="3" step="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Multiple Faces Duration</label>
+                        <input type="number" id="configMultiFaceDuration" value="2" step="1">
+                    </div>
+                </div>
+
+                <button class="btn-success" onclick="updateConfig()">Update Configuration</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_BASE = 'http://localhost:8000/api';
+        
+        // State
+        let currentSession = null;
+        let cameraStream = null;
+        let isAnalyzing = false;
+        let analysisInterval = null;
+        let violationsInterval = null;
+        let frameCount = 0;
+        let fps = 0;
+        let lastFrameTime = Date.now();
+
+        // Session Management
+        async function createSession() {
+            const studentId = document.getElementById('inputStudentId').value;
+            const quizId = document.getElementById('inputQuizId').value;
+            const profileImageFile = document.getElementById('inputProfileImage').files[0];
+
+            if (!studentId || !quizId) {
+                alert('Please enter Student ID and Quiz ID');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('student_id', studentId);
+            formData.append('quiz_id', quizId);
+            if (profileImageFile) {
+                formData.append('profile_image', profileImageFile);
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/session/start`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                currentSession = data.session_id;
+                
+                document.getElementById('sessionId').textContent = data.session_id;
+                document.getElementById('studentId').textContent = data.student_id;
+                document.getElementById('quizId').textContent = data.quiz_id;
+                document.getElementById('sessionState').textContent = data.status;
+                
+                document.getElementById('sessionStatus').className = 'status success';
+                document.getElementById('sessionStatus').textContent = '✓ Session created successfully';
+                document.getElementById('sessionInfo').style.display = 'block';
+                document.getElementById('sessionCreate').style.display = 'none';
+                document.getElementById('sessionActive').style.display = 'block';
+                
+                document.getElementById('analyzeBtn').disabled = false;
+                
+            } catch (error) {
+                console.error('Error creating session:', error);
+                document.getElementById('sessionStatus').className = 'status error';
+                document.getElementById('sessionStatus').textContent = '✗ Error creating session: ' + error.message;
+            }
+        }
+
+        async function endSession() {
+            if (!currentSession) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/session/end/${currentSession}`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+                
+                if (isAnalyzing) {
+                    toggleAnalysis();
+                }
+                
+                currentSession = null;
+                
+                document.getElementById('sessionStatus').className = 'status info';
+                document.getElementById('sessionStatus').textContent = 'Session ended';
+                document.getElementById('sessionInfo').style.display = 'none';
+                document.getElementById('sessionCreate').style.display = 'block';
+                document.getElementById('sessionActive').style.display = 'none';
+                
+                document.getElementById('analyzeBtn').disabled = true;
+                
+            } catch (error) {
+                console.error('Error ending session:', error);
+                alert('Error ending session: ' + error.message);
+            }
+        }
+
+        // Camera Management
+        async function toggleCamera() {
+            const video = document.getElementById('video');
+            const btn = document.getElementById('cameraBtn');
+
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+                video.srcObject = null;
+                btn.textContent = 'Start Camera';
+                btn.classList.remove('btn-danger');
+            } else {
+                try {
+                    cameraStream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { width: 1280, height: 720 } 
+                    });
+                    video.srcObject = cameraStream;
+                    btn.textContent = 'Stop Camera';
+                    btn.classList.add('btn-danger');
+                } catch (error) {
+                    console.error('Error accessing camera:', error);
+                    alert('Error accessing camera: ' + error.message);
+                }
+            }
+        }
+
+        // Analysis
+        function toggleAnalysis() {
+            if (!currentSession) {
+                alert('Please create a session first');
+                return;
+            }
+
+            if (!cameraStream) {
+                alert('Please start camera first');
+                return;
+            }
+
+            const btn = document.getElementById('analyzeBtn');
+
+            if (isAnalyzing) {
+                clearInterval(analysisInterval);
+                clearInterval(violationsInterval);
+                isAnalyzing = false;
+                btn.textContent = 'Start Analysis';
+                btn.classList.remove('btn-danger');
+            } else {
+                isAnalyzing = true;
+                btn.textContent = 'Stop Analysis';
+                btn.classList.add('btn-danger');
+                analysisInterval = setInterval(analyzeFrame, 100); // 10 FPS
+                violationsInterval = setInterval(fetchSessionViolations, 2000); // Fetch violations every 2s
+                fetchSessionViolations(); // Fetch immediately
+            }
+        }
+
+        async function analyzeFrame() {
+            if (!currentSession || !isAnalyzing) return;
+
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+
+            // Convert canvas to base64
+            const base64Image = canvas.toDataURL('image/jpeg', 0.8);
+
+            try {
+                const response = await fetch(`${API_BASE}/analyze/frame/${currentSession}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        frame_base64: base64Image
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                updateAnalysisResults(data);
+                updateViolations(data.violations);
+                updateStats();
+                
+            } catch (error) {
+                console.error('Error analyzing frame:', error);
+            }
+        }
+
+        function updateAnalysisResults(data) {
+            const container = document.getElementById('analysisResults');
+            
+            // Extract analysis object
+            const analysis = data.analysis || {};
+            
+            // Update stat cards
+            document.getElementById('faceCount').textContent = data.face_count || 0;
+            
+            const headPose = analysis.head_pose;
+            if (headPose && !headPose.is_looking_forward) {
+                document.getElementById('headPoseStatus').textContent = '⚠️';
+            } else {
+                document.getElementById('headPoseStatus').textContent = '✓';
+            }
+            
+            const gaze = analysis.gaze;
+            if (gaze && !gaze.is_looking_at_screen) {
+                document.getElementById('gazeStatus').textContent = '⚠️';
+            } else {
+                document.getElementById('gazeStatus').textContent = '✓';
+            }
+            
+            const objects = analysis.object_detection?.objects || [];
+            document.getElementById('objectCount').textContent = objects.length;
+
+            // Build detailed results
+            let html = `<div class="result-item">
+                <strong>Timestamp:</strong> ${new Date(data.timestamp).toLocaleTimeString()}<br>`;
+            
+            // Face detection
+            html += `<strong>Faces:</strong> ${data.face_count} 
+                <span class="badge ${data.violations.length > 0 ? 'error' : 'success'}">
+                    ${data.violations.length > 0 ? 'Violations' : 'OK'}
+                </span><br>`;
+            
+            if (headPose) {
+                html += `<strong>Head Pose:</strong> 
+                    Yaw: ${headPose.yaw?.toFixed(1)}°, 
+                    Pitch: ${headPose.pitch?.toFixed(1)}° 
+                    <span class="badge ${headPose.is_looking_forward ? 'success' : 'warning'}">
+                        ${headPose.is_looking_forward ? 'Forward' : 'Away'}
+                    </span><br>`;
+            }
+            
+            if (gaze) {
+                html += `<strong>Gaze:</strong> 
+                    H: ${gaze.horizontal_ratio?.toFixed(2)}, 
+                    V: ${gaze.vertical_ratio?.toFixed(2)} 
+                    <span class="badge ${gaze.is_looking_at_screen ? 'success' : 'warning'}">
+                        ${gaze.is_looking_at_screen ? 'On Screen' : 'Off Screen'}
+                    </span><br>`;
+            }
+            
+            const blinks = analysis.blink;
+            if (blinks) {
+                html += `<strong>Blinks:</strong> ${blinks.total_blinks} 
+                    (EAR: ${blinks.ear?.toFixed(3)})<br>`;
+            }
+            
+            if (objects.length > 0) {
+                html += `<strong>Objects:</strong> `;
+                objects.forEach(obj => {
+                    html += `${obj.class} (${(obj.confidence * 100).toFixed(0)}%) `;
+                });
+                html += '<br>';
+            }
+            
+            const identity = analysis.identity_verification;
+            if (identity) {
+                html += `<strong>Identity:</strong> 
+                    <span class="badge ${identity.match ? 'success' : 'error'}">
+                        ${identity.match ? 'Verified' : 'Mismatch'} 
+                        ${identity.distance ? `(${identity.distance.toFixed(2)})` : ''}
+                    </span><br>`;
+            }
+            
+            html += `</div>`;
+            
+            container.innerHTML = html + container.innerHTML;
+            
+            // Keep only last 5 results
+            const items = container.querySelectorAll('.result-item');
+            if (items.length > 5) {
+                for (let i = 5; i < items.length; i++) {
+                    items[i].remove();
+                }
+            }
+        }
+
+        function updateViolations(violations) {
+            if (!violations) return;
+
+            const container = document.getElementById('violationsList');
+            
+            if (violations.length === 0) {
+                container.innerHTML = '<p style="color: #999; text-align: center;">No violations detected</p>';
+                return;
+            }
+            
+            let html = '';
+            violations.forEach(v => {
+                html += `<div class="violation-item">
+                    <strong>${v.type}</strong> - ${v.message || v.description}<br>
+                    <small>Timestamp: ${new Date(v.timestamp || v.first_occurrence).toLocaleTimeString()}
+                    ${v.count ? `, Count: ${v.count}` : ''}</small>
+                </div>`;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // Fetch and display all session violations
+        async function fetchSessionViolations() {
+            if (!currentSession) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/session/${currentSession}/violations`);
+                if (!response.ok) return;
+
+                const data = await response.json();
+                if (data.violations && data.violations.length > 0) {
+                    updateViolations(data.violations);
+                }
+            } catch (error) {
+                console.error('Error fetching violations:', error);
+            }
+        }
+
+        function updateStats() {
+            frameCount++;
+            document.getElementById('frameCounter').textContent = frameCount;
+            
+            const now = Date.now();
+            const elapsed = (now - lastFrameTime) / 1000;
+            if (elapsed >= 1) {
+                fps = Math.round(frameCount / elapsed);
+                document.getElementById('fpsCounter').textContent = fps;
+                frameCount = 0;
+                lastFrameTime = now;
+            }
+        }
+
+        // Settings Management
+        async function updateSettings() {
+            if (!currentSession) return;
+
+            const settings = {
+                enable_no_face_warning: document.getElementById('settingNoFace').checked,
+                enable_face_detection: document.getElementById('settingMultiFace').checked,
+                enable_head_pose: document.getElementById('settingHeadPose').checked,
+                enable_gaze: document.getElementById('settingGaze').checked,
+                enable_object_detection: document.getElementById('settingObject').checked,
+                enable_identity_verification: document.getElementById('settingIdentity').checked
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/session/${currentSession}/settings`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settings)
+                });
+
+                const data = await response.json();
+                console.log('Settings updated:', data);
+                
+            } catch (error) {
+                console.error('Error updating settings:', error);
+            }
+        }
+
+        // Configuration Management
+        async function updateConfig() {
+            const config = {
+                head_pose: {
+                    max_yaw_angle: parseFloat(document.getElementById('configYaw').value),
+                    max_pitch_angle: parseFloat(document.getElementById('configPitch').value)
+                },
+                gaze: {
+                    max_horizontal_deviation: parseFloat(document.getElementById('configGazeH').value),
+                    max_vertical_deviation: parseFloat(document.getElementById('configGazeV').value)
+                },
+                blink: {
+                    ear_threshold: parseFloat(document.getElementById('configEar').value),
+                    ear_consec_frames: parseInt(document.getElementById('configBlinkFrames').value)
+                },
+                thresholds: {
+                    no_face_duration: parseFloat(document.getElementById('configNoFaceDuration').value),
+                    multiple_faces_duration: parseFloat(document.getElementById('configMultiFaceDuration').value)
+                }
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/config`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+
+                const data = await response.json();
+                alert('Configuration updated successfully!');
+                console.log('Config updated:', data);
+                
+            } catch (error) {
+                console.error('Error updating config:', error);
+                alert('Error updating configuration: ' + error.message);
+            }
+        }
+
+        async function clearViolations() {
+            if (!currentSession) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/session/${currentSession}/violations`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+                document.getElementById('violationsList').innerHTML = 
+                    '<p style="color: #999; text-align: center;">No violations detected</p>';
+                alert('Violations cleared!');
+                
+            } catch (error) {
+                console.error('Error clearing violations:', error);
+                alert('Error clearing violations: ' + error.message);
+            }
+        }
+
+        // Load current configuration on page load
+        async function loadCurrentConfig() {
+            try {
+                const response = await fetch(`${API_BASE}/config`);
+                const config = await response.json();
+                
+                if (config.head_pose) {
+                    document.getElementById('configYaw').value = config.head_pose.max_yaw_angle || 30;
+                    document.getElementById('configPitch').value = config.head_pose.max_pitch_angle || 20;
+                }
+                if (config.gaze) {
+                    document.getElementById('configGazeH').value = config.gaze.max_horizontal_deviation || 0.3;
+                    document.getElementById('configGazeV').value = config.gaze.max_vertical_deviation || 0.2;
+                }
+                if (config.blink) {
+                    document.getElementById('configEar').value = config.blink.ear_threshold || 0.2;
+                    document.getElementById('configBlinkFrames').value = config.blink.ear_consec_frames || 2;
+                }
+                if (config.thresholds) {
+                    document.getElementById('configNoFaceDuration').value = config.thresholds.no_face_duration || 3;
+                    document.getElementById('configMultiFaceDuration').value = config.thresholds.multiple_faces_duration || 2;
+                }
+            } catch (error) {
+                console.error('Error loading config:', error);
+            }
+        }
+
+        // Initialize
+        window.onload = () => {
+            loadCurrentConfig();
+            console.log('AI Proctoring Test UI Ready!');
+            console.log('API Base:', API_BASE);
+        };
+
+        // Cleanup on page unload
+        window.onbeforeunload = () => {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+            }
+            if (isAnalyzing) {
+                clearInterval(analysisInterval);
+            }
+        };
+    </script>
+</body>
+</html>
