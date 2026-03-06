@@ -11,7 +11,7 @@ import os
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from src.web.api.routes import session, analysis, settings, config, violations
+from src.web.api.routes import session, analysis, settings, config, violations, websocket
 from src.web.api.models import HealthResponse
 from src.web.core.session_manager import session_manager
 from src.utils.logger import get_logger
@@ -61,6 +61,9 @@ app.include_router(config.router)
 # Violations routes
 app.include_router(violations.router)
 
+# WebSocket routes
+app.include_router(websocket.router)
+
 # ============================================================================
 # Root Endpoint
 # ============================================================================
@@ -92,6 +95,7 @@ async def startup_event():
     logger.info("Starting server...")
     logger.info("API Documentation: http://localhost:8000/docs")
     logger.info("Alternative Docs: http://localhost:8000/redoc")
+    logger.info("WebSocket Endpoint: ws://localhost:8000/ws/{session_id}")
     logger.info("="*60)
 
 
