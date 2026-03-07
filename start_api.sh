@@ -14,8 +14,8 @@ fi
 
 # Start the server
 echo "Starting FastAPI server..."
-echo "API URL: http://localhost:8000"
-echo "Documentation: http://localhost:8000/docs"
+echo "API URL: http://localhost:8134"
+echo "Documentation: http://localhost:8134/docs"
 echo ""
 echo "Press Ctrl+C to stop the server"
 echo ""
@@ -28,4 +28,4 @@ cd "$PROJECT_ROOT"
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 
 # Run the server
-uvicorn src.web.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn src.web.main:app --reload --host 0.0.0.0 --port 8134

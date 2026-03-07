@@ -10,6 +10,11 @@ class ViolationTracker:
         self.last_pose_direction = None
         self.no_frame_start_time = None
         self.last_frame_received_time = None
+        self.gaze_start_time = None
+        self.last_gaze_direction = None
+        self.phone_start_time = None
+        self.person_body_start_time = None
+        self.identity_start_time = None
 
     def reset(self):
         self.violations = []
@@ -19,6 +24,33 @@ class ViolationTracker:
         self.last_pose_direction = None
         self.no_frame_start_time = None
         self.last_frame_received_time = None
+        self.gaze_start_time = None
+        self.last_gaze_direction = None
+        self.phone_start_time = None
+        self.person_body_start_time = None
+        self.identity_start_time = None
+    
+    def clear_feature_state(self, feature_name):
+        """
+        Clear violation state for a specific feature when it's disabled
+        
+        Args:
+            feature_name: Name of the feature ('head_pose', 'gaze', 'blink', 'identity', 'object', 'face')
+        """
+        if feature_name == 'head_pose':
+            self.head_pose_start_time = None
+            self.last_pose_direction = None
+        elif feature_name == 'gaze':
+            self.gaze_start_time = None
+            self.last_gaze_direction = None
+        elif feature_name == 'identity':
+            self.identity_start_time = None
+        elif feature_name == 'object':
+            self.phone_start_time = None
+            self.person_body_start_time = None
+        elif feature_name == 'face':
+            self.no_face_start_time = None
+            self.face_count_start_time = None
 
     def check_face_count(self, face_count, max_faces, persistence_time=0):
         if face_count > max_faces:
@@ -239,11 +271,6 @@ class ViolationTracker:
         # 1. Phone Detection
         if object_data.get('phone_detected', False):
             # Check persistence
-             # Use a unique key for phone timer?
-             # Or reuse a generic object timer? Let's use specific.
-             if not hasattr(self, 'phone_start_time'):
-                 self.phone_start_time = None
-                 
              if self.phone_start_time is None:
                  self.phone_start_time = time.time()
                  return False, False, ""
@@ -262,9 +289,6 @@ class ViolationTracker:
         # The user said "apart from the user if someone else is wandering".
         # So count > 1.
         if object_data.get('person_count', 0) > 1:
-             if not hasattr(self, 'person_body_start_time'):
-                 self.person_body_start_time = None
-                 
              if self.person_body_start_time is None:
                  self.person_body_start_time = time.time()
                  return False, False, ""
@@ -300,7 +324,7 @@ class ViolationTracker:
             return False, False, ""
             
         # Mismatch detected!
-        if not hasattr(self, 'identity_start_time') or self.identity_start_time is None:
+        if self.identity_start_time is None:
             self.identity_start_time = time.time()
             return False, False, ""
             
@@ -367,7 +391,7 @@ class ViolationTracker:
             return False, False, ""
             
         # Looking Away
-        if not hasattr(self, 'gaze_start_time') or self.gaze_start_time is None:
+        if self.gaze_start_time is None:
             self.gaze_start_time = time.time()
             self.last_gaze_direction = direction
             return False, False, ""

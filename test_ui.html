@@ -1051,39 +1051,53 @@
                 </span><br>`;
 
             if (headPose) {
-                html += `<strong>Head Pose:</strong> 
-                    Yaw: ${headPose.yaw?.toFixed(1)}°, 
-                    Pitch: ${headPose.pitch?.toFixed(1)}° 
-                    <span class="badge ${headPose.is_looking_forward ? 'success' : 'warning'}">
-                        ${headPose.is_looking_forward ? 'Forward' : 'Away'}
-                    </span><br>`;
+                const headPoseEnabled = document.getElementById('settingHeadPose')?.checked;
+                if (headPoseEnabled) {
+                    html += `<strong>Head Pose:</strong> 
+                        Yaw: ${headPose.yaw?.toFixed(1)}°, 
+                        Pitch: ${headPose.pitch?.toFixed(1)}° 
+                        <span class="badge ${headPose.is_looking_forward ? 'success' : 'warning'}">
+                            ${headPose.is_looking_forward ? 'Forward' : 'Away'}
+                        </span><br>`;
+                }
             }
 
             if (gaze) {
-                html += `<strong>Gaze:</strong> 
-                    H: ${gaze.horizontal_ratio?.toFixed(2)}, 
-                    V: ${gaze.vertical_ratio?.toFixed(2)} 
-                    <span class="badge ${gaze.is_looking_at_screen ? 'success' : 'warning'}">
-                        ${gaze.is_looking_at_screen ? 'On Screen' : 'Off Screen'}
-                    </span><br>`;
+                const gazeEnabled = document.getElementById('settingGaze')?.checked;
+                if (gazeEnabled) {
+                    html += `<strong>Gaze:</strong> 
+                        H: ${gaze.horizontal_ratio?.toFixed(2)}, 
+                        V: ${gaze.vertical_ratio?.toFixed(2)} 
+                        <span class="badge ${gaze.is_looking_at_screen ? 'success' : 'warning'}">
+                            ${gaze.is_looking_at_screen ? 'On Screen' : 'Off Screen'}
+                        </span><br>`;
+                }
             }
 
             const blinks = analysis.blink;
             if (blinks) {
-                html += `<strong>Blinks:</strong> ${blinks.total_blinks} 
-                    (EAR: ${blinks.ear?.toFixed(3)})<br>`;
+                const blinkEnabled = document.getElementById('settingBlink')?.checked;
+                if (blinkEnabled) {
+                    html += `<strong>Blinks:</strong> ${blinks.total_blinks} 
+                        (EAR: ${blinks.ear?.toFixed(3)})<br>`;
+                }
             }
 
             if (objects.length > 0) {
-                html += `<strong>Objects:</strong> `;
-                objects.forEach(obj => {
-                    html += `${obj.class} (${(obj.confidence * 100).toFixed(0)}%) `;
-                });
-                html += '<br>';
+                const objectEnabled = document.getElementById('settingObject')?.checked;
+                if (objectEnabled) {
+                    html += `<strong>Objects:</strong> `;
+                    objects.forEach(obj => {
+                        html += `${obj.class} (${(obj.confidence * 100).toFixed(0)}%) `;
+                    });
+                    html += '<br>';
+                }
             }
 
             const identity = analysis.identity_verification;
-            if (identity) {
+            // Only show identity verification results if the setting is currently enabled
+            const identityEnabled = document.getElementById('settingIdentity')?.checked;
+            if (identity && identityEnabled) {
                 html += `<strong>Identity:</strong> 
                     <span class="badge ${identity.match ? 'success' : 'error'}">
                         ${identity.match ? 'Verified' : 'Mismatch'} 
@@ -1180,6 +1194,12 @@
 
                 const data = await response.json();
                 console.log('Settings updated:', data);
+                
+                // Clear existing results to avoid confusion with cached data
+                const resultsContainer = document.getElementById('analysisResults');
+                if (resultsContainer) {
+                    resultsContainer.innerHTML = '';
+                }
 
             } catch (error) {
                 console.error('Error updating settings:', error);

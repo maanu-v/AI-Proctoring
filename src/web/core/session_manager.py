@@ -70,12 +70,37 @@ class QuizSession:
     
     def update_settings(self, settings: Dict) -> None:
         """
-        Update session settings
+        Update session settings and clear violation states for disabled features
         
         Args:
             settings: Dictionary of settings to update
         """
+        # Track which features are being disabled
+        features_to_clear = []
+        
+        # Map setting keys to feature names for violation tracker
+        setting_to_feature = {
+            'enable_head_pose': 'head_pose',
+            'enable_gaze': 'gaze',
+            'enable_identity_verification': 'identity',
+            'enable_object_detection': 'object',
+            'enable_face_detection': 'face',
+            'enable_no_face_warning': 'face'
+        }
+        
+        # Check which features are being disabled
+        for setting_key, feature_name in setting_to_feature.items():
+            if setting_key in settings:
+                # If the setting was previously enabled and is now being disabled
+                if self.settings.get(setting_key, True) and not settings[setting_key]:
+                    features_to_clear.append(feature_name)
+        
+        # Update settings
         self.settings.update(settings)
+        
+        # Clear violation states for disabled features
+        for feature in features_to_clear:
+            self.violation_tracker.clear_feature_state(feature)
     
     def increment_frame_count(self) -> int:
         """
