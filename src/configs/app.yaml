@@ -71,3 +71,16 @@ thresholds:
   identity_check_interval_frames: 30
   # Duration in seconds identity mismatch must persist to trigger a warning.
   identity_persistence_time: 2
+
+# Session management settings
+session:
+  # Interval in seconds for automatic session cleanup task (default: 600 = 10 minutes).
+  cleanup_interval_seconds: 600
+  # Maximum inactivity duration in minutes before session is automatically deleted (default: 60 minutes).
+  max_inactivity_minutes: 60
+  # Inactivity threshold in minutes for warning logs (default: 30 minutes).
+  # Sessions inactive longer than this will be logged as warnings.
+  inactivity_warning_minutes: 30
+  # Minimum inactivity duration in seconds before logging session resume as violation (default: 10 seconds).
+  # Brief disconnections (< 10s) won't be flagged as suspicious.
+  resume_violation_threshold_seconds: 10

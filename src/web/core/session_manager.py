@@ -6,6 +6,7 @@ import time
 from datetime import datetime
 from typing import Optional, Dict
 import numpy as np
+import logging
 
 import sys
 import os
@@ -13,6 +14,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.
 
 from src.engine.proctor import ViolationTracker
 from src.utils.config import config
+
+logger = logging.getLogger(__name__)
 
 
 class QuizSession:
@@ -139,8 +142,9 @@ class QuizSession:
         self.resume_events.append(resume_event)
         self.last_activity_time = now
         
-        # Log as violation if inactivity was significant (> 10 seconds)
-        if inactivity_duration > 10:
+        # Log as violation if inactivity was significant
+        threshold = config.session.resume_violation_threshold_seconds
+        if inactivity_duration > threshold:
             msg = f"Session resumed after {int(inactivity_duration)}s of inactivity (Resume #{self.resume_count})"
             self.violation_tracker.log_violation(msg, violation_type='session_resume')
         
@@ -258,6 +262,63 @@ class SessionManager:
             Number of active sessions
         """
         return len(self._sessions)
+    
+    def cleanup_inactive_sessions(self, max_inactivity_minutes: int = 60) -> int:
+        """
+        Remove sessions that have been inactive for too long
+        
+        Args:
+            max_inactivity_minutes: Maximum inactivity time before cleanup (default: 60 minutes)
+            
+        Returns:
+            Number of sessions cleaned up
+        """
+        now = datetime.now()
+        sessions_to_remove = []
+        
+        for session_id, session in self._sessions.items():
+            inactivity_seconds = (now - session.last_activity_time).total_seconds()
+            inactivity_minutes = inactivity_seconds / 60
+            
+            if inactivity_minutes > max_inactivity_minutes:
+                sessions_to_remove.append(session_id)
+        
+        # Remove inactive sessions
+        for session_id in sessions_to_remove:
+            self._sessions.pop(session_id, None)
+        
+        if sessions_to_remove:
+            logger.info(f"Cleaned up {len(sessions_to_remove)} inactive sessions")
+        
+        return len(sessions_to_remove)
+    
+    def get_inactive_sessions(self, inactivity_minutes: int = 30) -> list:
+        """
+        Get list of sessions inactive for specified duration
+        
+        Args:
+            inactivity_minutes: Inactivity threshold in minutes
+            
+        Returns:
+            List of inactive session IDs with their inactivity durations
+        """
+        now = datetime.now()
+        inactive = []
+        
+        for session_id, session in self._sessions.items():
+            inactivity_seconds = (now - session.last_activity_time).total_seconds()
+            inactivity_minutes_actual = inactivity_seconds / 60
+            
+            if inactivity_minutes_actual > inactivity_minutes:
+                inactive.append({
+                    'session_id': session_id,
+                    'student_id': session.student_id,
+                    'quiz_id': session.quiz_id,
+                    'inactivity_minutes': int(inactivity_minutes_actual),
+                    'last_activity': session.last_activity_time.isoformat()
+                })
+        
+        return inactive
     
     def session_exists(self, session_id: str) -> bool:
         """

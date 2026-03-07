@@ -150,3 +150,44 @@ async def list_sessions(
         "active_sessions": session_mgr.get_session_count(),
         "sessions": session_mgr.list_sessions()
     }
+
+
+@router.get("/s/inactive")  # This becomes /api/sessions/inactive
+async def list_inactive_sessions(
+    inactivity_minutes: int = 30,
+    session_mgr: SessionManager = Depends(get_session_manager)
+):
+    """
+    List sessions that have been inactive for a specified duration
+    
+    - **inactivity_minutes**: Minimum inactivity duration in minutes (default: 30)
+    """
+    inactive = session_mgr.get_inactive_sessions(inactivity_minutes)
+    
+    return {
+        "inactive_sessions": len(inactive),
+        "inactivity_threshold_minutes": inactivity_minutes,
+        "sessions": inactive
+    }
+
+
+@router.post("/s/cleanup")  # This becomes /api/sessions/cleanup
+async def cleanup_sessions(
+    max_inactivity_minutes: int = 60,
+    session_mgr: SessionManager = Depends(get_session_manager)
+):
+    """
+    Manually trigger cleanup of inactive sessions
+    
+    - **max_inactivity_minutes**: Remove sessions inactive for more than this duration (default: 60)
+    """
+    cleaned = session_mgr.cleanup_inactive_sessions(max_inactivity_minutes)
+    
+    logger.info(f"Manual cleanup: Removed {cleaned} inactive sessions")
+    
+    return {
+        "message": f"Cleaned up {cleaned} inactive sessions",
+        "sessions_removed": cleaned,
+        "inactivity_threshold_minutes": max_inactivity_minutes,
+        "remaining_sessions": session_mgr.get_session_count()
+    }

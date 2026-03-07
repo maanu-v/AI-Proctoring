@@ -51,6 +51,13 @@ class GazeConfig:
     vertical_threshold_down: float = 0.60
     smoothing_factor: float = 0.5
 
+@dataclass
+class SessionConfig:
+    cleanup_interval_seconds: int = 600
+    max_inactivity_minutes: int = 60
+    inactivity_warning_minutes: int = 30
+    resume_violation_threshold_seconds: int = 10
+
 class Config:
     def __init__(self, config_path: str = "src/configs/app.yaml"):
         self.config_path = config_path
@@ -62,6 +69,7 @@ class Config:
         self.gaze = GazeConfig(**self._config.get("gaze", {}))
         self.blink = BlinkConfig(**self._config.get("blink", {}))
         self.thresholds = ThresholdsConfig(**self._config.get("thresholds", {}))
+        self.session = SessionConfig(**self._config.get("session", {}))
 
     def _load_config(self) -> Dict[str, Any]:
         try:
