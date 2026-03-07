@@ -28,4 +28,4 @@ cd "$PROJECT_ROOT"
 export PYTHONPATH="$PROJECT_ROOT:$PYTHONPATH"
 
 # Run the server
-uvicorn src.web.main:app --reload --host 0.0.0.0 --port 8134
+uvicorn src.web.main:app --reload --host 0.0.0.0 --port 8000

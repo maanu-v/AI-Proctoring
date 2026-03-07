@@ -1,1 +1,1 @@
-command:remote-containers.revealLogTerminal
+# This file makes the src directory a Python package
