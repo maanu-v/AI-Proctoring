@@ -52,28 +52,34 @@ async def start_session(
                 if ref_embedding is None:
                     logger.warning("Could not generate embedding from profile image")
         
-        # Create session
+        # Create session (or resume if already exists)
         try:
-            session_id, session = session_mgr.create_session(
+            session_id, session, is_resumed = session_mgr.create_session(
                 student_id, 
                 quiz_id, 
-                profile_img
+                profile_img,
+                allow_resume=True
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         
-        # Set reference embedding if available
-        if ref_embedding is not None:
+        # Set reference embedding if available (only for new sessions)
+        if ref_embedding is not None and not is_resumed:
             session.set_reference_embedding(ref_embedding)
         
-        logger.info(f"Started session {session_id} for student {student_id}, quiz {quiz_id}")
+        if is_resumed:
+            logger.warning(f"Resumed session {session_id} for student {student_id}, quiz {quiz_id} (Resume #{session.resume_count})")
+            message = f"Session resumed successfully (Resume #{session.resume_count})"
+        else:
+            logger.info(f"Started session {session_id} for student {student_id}, quiz {quiz_id}")
+            message = "Session started successfully"
         
         return SessionResponse(
             session_id=session_id,
             student_id=student_id,
             quiz_id=quiz_id,
             created_at=session.created_at.isoformat(),
-            message="Session started successfully"
+            message=message
         )
         
     except HTTPException:
@@ -97,14 +103,19 @@ async def end_session(
         raise HTTPException(status_code=404, detail="Session not found")
     
     # Generate final report
+    duration_seconds = (datetime.now() - session.created_at).total_seconds()
+    
     report = {
         "session_id": session_id,
         "student_id": session.student_id,
         "quiz_id": session.quiz_id,
         "started_at": session.created_at.isoformat(),
         "ended_at": datetime.now().isoformat(),
+        "duration_seconds": int(duration_seconds),
         "total_frames": session.frame_count,
         "total_violations": session.violation_tracker.get_violation_count(),
+        "resume_count": session.resume_count,
+        "resume_events": session.resume_events,
         "violations": session.get_violations(),
         "settings": session.settings
     }

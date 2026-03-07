@@ -38,7 +38,10 @@ class QuizSession:
         self.reference_embedding = None
         self.violation_tracker = ViolationTracker()
         self.created_at = datetime.now()
+        self.last_activity_time = datetime.now()
         self.frame_count = 0
+        self.resume_count = 0  # Track how many times session was resumed
+        self.resume_events = []  # Track resume timestamps and inactivity durations
         
         # Default settings (can be modified per session)
         self.settings = {
@@ -65,6 +68,8 @@ class QuizSession:
             "created_at": self.created_at.isoformat(),
             "frame_count": self.frame_count,
             "violation_count": self.violation_tracker.get_violation_count(),
+            "resume_count": self.resume_count,
+            "last_activity": self.last_activity_time.isoformat(),
             "settings": self.settings
         }
     
@@ -110,7 +115,36 @@ class QuizSession:
             Updated frame count
         """
         self.frame_count += 1
+        self.last_activity_time = datetime.now()
         return self.frame_count
+    
+    def resume_session(self) -> Dict:
+        """
+        Resume an existing session after inactivity
+        
+        Returns:
+            Dictionary with resume information including inactivity duration
+        """
+        now = datetime.now()
+        inactivity_duration = (now - self.last_activity_time).total_seconds()
+        
+        self.resume_count += 1
+        
+        resume_event = {
+            "timestamp": now.isoformat(),
+            "inactivity_seconds": inactivity_duration,
+            "resume_number": self.resume_count
+        }
+        
+        self.resume_events.append(resume_event)
+        self.last_activity_time = now
+        
+        # Log as violation if inactivity was significant (> 10 seconds)
+        if inactivity_duration > 10:
+            msg = f"Session resumed after {int(inactivity_duration)}s of inactivity (Resume #{self.resume_count})"
+            self.violation_tracker.log_violation(msg, violation_type='session_resume')
+        
+        return resume_event
     
     def set_reference_embedding(self, embedding) -> None:
         """
@@ -146,31 +180,42 @@ class SessionManager:
         self, 
         student_id: str, 
         quiz_id: str,
-        profile_image: Optional[np.ndarray] = None
-    ) -> tuple[str, QuizSession]:
+        profile_image: Optional[np.ndarray] = None,
+        allow_resume: bool = True
+    ) -> tuple[str, QuizSession, bool]:
         """
-        Create a new session
+        Create a new session or resume existing one
         
         Args:
             student_id: Student identifier
             quiz_id: Quiz identifier
             profile_image: Optional profile image
+            allow_resume: If True, resume existing session instead of error
             
         Returns:
-            Tuple of (session_id, QuizSession)
+            Tuple of (session_id, QuizSession, is_resumed)
+            is_resumed is True if session was resumed, False if newly created
             
         Raises:
-            ValueError: If session already exists
+            ValueError: If session already exists and allow_resume is False
         """
         session_id = self._generate_session_id(student_id, quiz_id)
         
         if session_id in self._sessions:
-            raise ValueError("Session already exists")
+            if not allow_resume:
+                raise ValueError("Session already exists")
+            
+            # Resume existing session
+            session = self._sessions[session_id]
+            resume_info = session.resume_session()
+            
+            return session_id, session, True
         
+        # Create new session
         session = QuizSession(student_id, quiz_id, profile_image)
         self._sessions[session_id] = session
         
-        return session_id, session
+        return session_id, session, False
     
     def get_session(self, session_id: str) -> Optional[QuizSession]:
         """

@@ -45,9 +45,27 @@ profile_image: file (optional) - Image file for identity verification
 }
 ```
 
+**If Session Already Exists (Student returns after leaving):**
+```json
+{
+  "session_id": "STU123_QUIZ001_1234567890",
+  "student_id": "STU123",
+  "quiz_id": "QUIZ001", 
+  "created_at": "2026-03-06T12:30:45.123456",
+  "message": "Session resumed successfully (Resume #1)"
+}
+```
+
+**Behavior:**
+- If session doesn't exist → Creates new session
+- If session exists → **Resumes existing session** (no error)
+- Resume tracking: Logs inactivity duration and increments resume counter
+- If inactivity > 10 seconds → Logged as `session_resume` violation
+- Helps detect students leaving exam to consult notes/others
+
 **Status Codes:**
-- `200 OK` - Session created successfully
-- `400 Bad Request` - Invalid input or duplicate session
+- `200 OK` - Session created or resumed successfully
+- `400 Bad Request` - Invalid input
 - `500 Internal Server Error` - Server error
 
 ---
@@ -66,8 +84,10 @@ Get information about an active session.
   "student_id": "STU123",
   "quiz_id": "QUIZ001",
   "created_at": "2026-03-06T12:30:45.123456",
+  "last_activity": "2026-03-06T12:45:30.789012",
   "frame_count": 1250,
   "violation_count": 3,
+  "resume_count": 1,
   "settings": {
     "enable_face_detection": true,
     "enable_head_pose": true,
@@ -1279,8 +1299,20 @@ print(f"Final report: {report}")
 | `gaze` | Eyes looking away | Gaze not centered for persistence time (default: 2s) |
 | `object_detection` | Phone or unauthorized person | Phone detected or person_count > 1 for persistence time (default: 2s) |
 | `identity_mismatch` | Face doesn't match profile | Face embedding distance > threshold for persistence time (default: 3s) |
+| `session_resume` | Session resumed after inactivity | Student left and returned to exam (inactivity > 10s) |
+| `no_frames` | No frames received | No analysis frames received for configured time |
 
 **Persistence Time:** All violations require the condition to persist for a configured duration before being triggered. This prevents false positives from momentary movements.
+
+### Session Resume Detection
+
+When a student restarts the session (closes browser and comes back), the system:
+- **Automatically resumes** the existing session
+- **Tracks inactivity duration** (time between last activity and resume)
+- **Logs as violation** if inactivity > 10 seconds
+- **Increments resume counter** to track total number of resumes
+
+This helps detect if students are leaving the exam to look up answers or consult with others.
 
 ---
 
