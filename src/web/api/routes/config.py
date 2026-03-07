@@ -81,6 +81,13 @@ async def update_config(config_update: ConfigUpdateRequest):
                     setattr(config.camera, key, value)
                     logger.info(f"Updated camera.{key} = {value}")
         
+        # Update mediapipe config
+        if "mediapipe" in update_data:
+            for key, value in update_data["mediapipe"].items():
+                if hasattr(config.mediapipe, key):
+                    setattr(config.mediapipe, key, value)
+                    logger.info(f"Updated mediapipe.{key} = {value}")
+        
         # Update head pose config
         if "head_pose" in update_data:
             for key, value in update_data["head_pose"].items():

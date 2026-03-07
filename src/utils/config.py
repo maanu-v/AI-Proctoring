@@ -28,6 +28,7 @@ class ThresholdsConfig:
     enable_no_face_warning: bool = True
     multi_face_persistence_time: float = 3.0
     no_face_persistence_time: float = 3.0
+    no_frame_persistence_time: float = 10.0
     head_pose_persistence_time: float = 3.0
     gaze_persistence_time: float = 2.0
     identity_check_interval_frames: int = 30

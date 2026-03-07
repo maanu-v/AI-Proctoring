@@ -1,0 +1,1 @@
+command:remote-containers.revealLogTerminal

@@ -61,11 +61,13 @@ class SettingsUpdateRequest(BaseModel):
     enable_object_detection: Optional[bool] = None
     enable_identity_verification: Optional[bool] = None
     enable_no_face_warning: Optional[bool] = None
+    enable_no_frame_warning: Optional[bool] = None
 
 
 class ConfigUpdateRequest(BaseModel):
     """Request model for updating global configuration"""
     camera: Optional[Dict[str, Any]] = None
+    mediapipe: Optional[Dict[str, Any]] = None
     head_pose: Optional[Dict[str, Any]] = None
     gaze: Optional[Dict[str, Any]] = None
     blink: Optional[Dict[str, Any]] = None

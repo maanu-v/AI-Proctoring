@@ -56,6 +56,9 @@ async def analyze_frame(
     """
     session.increment_frame_count()
     
+    # Record frame received for no-frame violation tracking
+    session.violation_tracker.record_frame_received()
+    
     try:
         # Decode frame
         frame = decode_base64_image(frame_base64)
@@ -299,6 +302,22 @@ async def analyze_frame(
                                     "message": id_msg,
                                     "timestamp": datetime.now().isoformat()
                                 })
+        
+        # ====================================================================
+        # No Frame Violation Check
+        # ====================================================================
+        if session.settings.get("enable_no_frame_warning", True):
+            nf_active, nf_triggered, nf_msg = session.violation_tracker.check_no_frames(
+                persistence_time=config.thresholds.no_frame_persistence_time
+            )
+            if nf_active:
+                warnings.append(nf_msg)
+                if nf_triggered:
+                    violations.append({
+                        "type": "no_frames",
+                        "message": nf_msg,
+                        "timestamp": datetime.now().isoformat()
+                    })
         
         # ====================================================================
         # Return Analysis Result

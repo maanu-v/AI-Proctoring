@@ -8,6 +8,8 @@ class ViolationTracker:
         self.face_count_start_time = None
         self.head_pose_start_time = None
         self.last_pose_direction = None
+        self.no_frame_start_time = None
+        self.last_frame_received_time = None
 
     def reset(self):
         self.violations = []
@@ -15,6 +17,8 @@ class ViolationTracker:
         self.face_count_start_time = None
         self.head_pose_start_time = None
         self.last_pose_direction = None
+        self.no_frame_start_time = None
+        self.last_frame_received_time = None
 
     def check_face_count(self, face_count, max_faces, persistence_time=0):
         if face_count > max_faces:
@@ -312,6 +316,38 @@ class ViolationTracker:
             
         return False, False, ""
 
+    def check_no_frames(self, persistence_time=10.0):
+        """
+        Check if no frames have been received for longer than persistence_time.
+        Should be called periodically (e.g. via a background task) or at 
+        frame-receive time to check elapsed gap.
+        
+        Returns: (is_active, is_triggered, message)
+        """
+        current_time = time.time()
+        
+        if self.last_frame_received_time is None:
+            # No frame has ever been received yet — not a violation
+            return False, False, ""
+        
+        elapsed = current_time - self.last_frame_received_time
+        
+        if elapsed >= persistence_time:
+            msg = f"No frames received for {int(elapsed)} seconds."
+            is_active = True
+            is_triggered = False
+            
+            if self.log_violation(msg, violation_type='no_frames'):
+                is_triggered = True
+            
+            return is_active, is_triggered, msg
+        
+        return False, False, ""
+    
+    def record_frame_received(self):
+        """Record that a frame was just received. Resets no-frame tracking."""
+        self.last_frame_received_time = time.time()
+    
     def get_violation_count(self):
         return len(self.violations)
 

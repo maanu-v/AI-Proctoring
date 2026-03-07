@@ -64,6 +64,8 @@ thresholds:
   head_pose_persistence_time: 3
   # Duration in seconds a gaze violation must persist to trigger a warning.
   gaze_persistence_time: 2
+  # Duration in seconds of no frames received before triggering a violation.
+  no_frame_persistence_time: 10
   # Interval in frames (at 30fps) to check identity. 30 = 1 sec, 3600 = 2 mins.
   # Higher values save resources but delay detection.
   identity_check_interval_frames: 30

@@ -84,6 +84,9 @@ async def websocket_endpoint(
                     
                     session.increment_frame_count()
                     
+                    # Record frame received for no-frame violation tracking
+                    session.violation_tracker.record_frame_received()
+                    
                     # Decode frame
                     frame = decode_base64_image(frame_base64)
                     
@@ -326,6 +329,22 @@ async def websocket_endpoint(
                                                 "message": id_msg,
                                                 "timestamp": datetime.now().isoformat()
                                             })
+                    
+                    # ====================================================================
+                    # No Frame Violation Check
+                    # ====================================================================
+                    if session.settings.get("enable_no_frame_warning", True):
+                        nf_active, nf_triggered, nf_msg = session.violation_tracker.check_no_frames(
+                            persistence_time=config.thresholds.no_frame_persistence_time
+                        )
+                        if nf_active:
+                            warnings.append(nf_msg)
+                            if nf_triggered:
+                                violations.append({
+                                    "type": "no_frames",
+                                    "message": nf_msg,
+                                    "timestamp": datetime.now().isoformat()
+                                })
                     
                     # ====================================================================
                     # Send Analysis Result

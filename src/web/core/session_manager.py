@@ -49,6 +49,7 @@ class QuizSession:
             "enable_object_detection": True,
             "enable_identity_verification": True,
             "enable_no_face_warning": config.thresholds.enable_no_face_warning,
+            "enable_no_frame_warning": True,
         }
     
     def to_dict(self) -> Dict:
