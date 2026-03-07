@@ -102,10 +102,11 @@ class HeadPoseEstimator:
         yaw = pose["yaw"]
         pitch = pose["pitch"]
 
+        # Swapped left/right to account for mirror effect in camera view
         if yaw > self.yaw_threshold:
-            return "Looking Right"
-        elif yaw < -self.yaw_threshold:
             return "Looking Left"
+        elif yaw < -self.yaw_threshold:
+            return "Looking Right"
         elif pitch > self.pitch_threshold:
             return "Looking Down"
         elif pitch < -self.pitch_threshold:
