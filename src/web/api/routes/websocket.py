@@ -7,6 +7,7 @@ from datetime import datetime
 import json
 import logging
 import time
+import base64
 import numpy as np
 
 from src.web.api.dependencies import get_session_manager, get_analyzer_manager
@@ -376,6 +377,71 @@ async def websocket_endpoint(
                         "message": f"Analysis error: {str(e)}"
                     })
             
+            elif message_type == "audio":
+                # Process audio for voice activity detection
+                try:
+                    audio_base64 = data.get("audio_base64")
+                    if not audio_base64:
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": "Missing audio_base64 in request"
+                        })
+                        continue
+
+                    audio_bytes = base64.b64decode(audio_base64)
+                    analyzers = analyzer_mgr.get_analyzers()
+
+                    audio_result = {}
+                    violations = []
+                    warnings = []
+
+                    if session.settings.get("enable_audio_detection", True):
+                        vad_result = analyzers["vad"].process(audio_bytes)
+
+                        audio_result = {
+                            "is_speech": vad_result["is_speech"],
+                            "speech_duration": vad_result["speech_duration"],
+                            "speech_segments": vad_result["speech_segments"],
+                            "frames_with_speech": vad_result["frames_with_speech"],
+                            "total_frames": vad_result["total_frames"],
+                        }
+
+                        # Check speech violation
+                        speech_active, speech_triggered, speech_msg = session.violation_tracker.check_speech_violation(
+                            vad_result["is_speech"],
+                            vad_result["speech_duration"],
+                            persistence_time=config.thresholds.speech_persistence_time
+                        )
+
+                        if speech_active:
+                            warnings.append(speech_msg)
+                            if speech_triggered:
+                                violations.append({
+                                    "type": "speech_detected",
+                                    "message": speech_msg,
+                                    "timestamp": datetime.now().isoformat()
+                                })
+
+                    response = {
+                        "type": "audio_analysis",
+                        "data": {
+                            "session_id": session_id,
+                            "timestamp": datetime.now().isoformat(),
+                            "audio": audio_result,
+                            "violations": violations,
+                            "warnings": warnings
+                        }
+                    }
+
+                    await websocket.send_json(response)
+
+                except Exception as e:
+                    logger.error(f"Error analyzing audio: {e}", exc_info=True)
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": f"Audio analysis error: {str(e)}"
+                    })
+
             elif message_type == "ping":
                 # Respond to ping with pong
                 await websocket.send_json({"type": "pong"})

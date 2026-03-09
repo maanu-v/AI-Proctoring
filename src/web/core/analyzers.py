@@ -12,6 +12,7 @@ from src.engine.face.gaze_estimation import GazeEstimator
 from src.engine.face.blink_estimation import BlinkEstimator
 from src.engine.obj_detection.obj_detect import ObjectDetector
 from src.engine.face.face_embedding import FaceEmbedder
+from src.engine.audio.vad import VADProcessor
 from src.utils.config import config
 from src.utils.logger import get_logger
 
@@ -41,6 +42,7 @@ class AnalyzerManager:
         self.blink_estimator = None
         self.object_detector = None
         self.face_embedder = None
+        self.vad_processor = None
         
         self._initialized = True
     
@@ -74,6 +76,14 @@ class AnalyzerManager:
             logger.info("Initializing FaceEmbedder...")
             self.face_embedder = FaceEmbedder()
         
+        if self.vad_processor is None:
+            logger.info("Initializing VADProcessor...")
+            self.vad_processor = VADProcessor(
+                aggressiveness=config.audio.vad_aggressiveness,
+                sample_rate=config.audio.sample_rate,
+                frame_duration_ms=config.audio.frame_duration_ms
+            )
+        
         logger.info("All analyzers initialized successfully")
     
     def get_analyzers(self) -> dict:
@@ -91,7 +101,8 @@ class AnalyzerManager:
             "gaze": self.gaze_estimator,
             "blink": self.blink_estimator,
             "object": self.object_detector,
-            "embedder": self.face_embedder
+            "embedder": self.face_embedder,
+            "vad": self.vad_processor
         }
     
     def is_initialized(self) -> bool:

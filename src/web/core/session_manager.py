@@ -56,6 +56,7 @@ class QuizSession:
             "enable_identity_verification": True,
             "enable_no_face_warning": config.thresholds.enable_no_face_warning,
             "enable_no_frame_warning": True,
+            "enable_audio_detection": True,
         }
     
     def to_dict(self) -> Dict:
@@ -93,7 +94,8 @@ class QuizSession:
             'enable_identity_verification': 'identity',
             'enable_object_detection': 'object',
             'enable_face_detection': 'face',
-            'enable_no_face_warning': 'face'
+            'enable_no_face_warning': 'face',
+            'enable_audio_detection': 'audio'
         }
         
         # Check which features are being disabled

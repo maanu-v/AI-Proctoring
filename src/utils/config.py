@@ -33,6 +33,7 @@ class ThresholdsConfig:
     gaze_persistence_time: float = 2.0
     identity_check_interval_frames: int = 30
     identity_persistence_time: float = 2.0
+    speech_persistence_time: float = 5.0
 
 @dataclass
 class BlinkConfig:
@@ -58,6 +59,12 @@ class SessionConfig:
     inactivity_warning_minutes: int = 30
     resume_violation_threshold_seconds: int = 10
 
+@dataclass
+class AudioConfig:
+    vad_aggressiveness: int = 2
+    sample_rate: int = 16000
+    frame_duration_ms: int = 20
+
 class Config:
     def __init__(self, config_path: str = "src/configs/app.yaml"):
         self.config_path = config_path
@@ -70,6 +77,7 @@ class Config:
         self.blink = BlinkConfig(**self._config.get("blink", {}))
         self.thresholds = ThresholdsConfig(**self._config.get("thresholds", {}))
         self.session = SessionConfig(**self._config.get("session", {}))
+        self.audio = AudioConfig(**self._config.get("audio", {}))
 
     def _load_config(self) -> Dict[str, Any]:
         try:

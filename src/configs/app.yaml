@@ -71,6 +71,17 @@ thresholds:
   identity_check_interval_frames: 30
   # Duration in seconds identity mismatch must persist to trigger a warning.
   identity_persistence_time: 2
+  # Duration in seconds of continuous speech before triggering a violation.
+  speech_persistence_time: 5
+
+audio:
+  # VAD aggressiveness: 0 (least filtering) to 3 (most aggressive).
+  # Mode 2 is recommended for proctoring — filters ambient noise, catches speech.
+  vad_aggressiveness: 2
+  # Audio sample rate in Hz. Must be 8000, 16000, 32000, or 48000.
+  sample_rate: 16000
+  # Frame duration in ms for VAD processing. Must be 10, 20, or 30.
+  frame_duration_ms: 20
 
 # Session management settings
 session:

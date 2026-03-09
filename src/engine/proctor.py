@@ -15,6 +15,7 @@ class ViolationTracker:
         self.phone_start_time = None
         self.person_body_start_time = None
         self.identity_start_time = None
+        self.speech_start_time = None
 
     def reset(self):
         self.violations = []
@@ -29,6 +30,7 @@ class ViolationTracker:
         self.phone_start_time = None
         self.person_body_start_time = None
         self.identity_start_time = None
+        self.speech_start_time = None
     
     def clear_feature_state(self, feature_name):
         """
@@ -51,6 +53,8 @@ class ViolationTracker:
         elif feature_name == 'face':
             self.no_face_start_time = None
             self.face_count_start_time = None
+        elif feature_name == 'audio':
+            self.speech_start_time = None
 
     def check_face_count(self, face_count, max_faces, persistence_time=0):
         if face_count > max_faces:
@@ -413,4 +417,36 @@ class ViolationTracker:
                 
             return True, is_triggered, msg
             
+        return False, False, ""
+
+    def check_speech_violation(self, is_speech, speech_duration, persistence_time=5.0):
+        """
+        Check for speech/voice activity violation.
+        Triggers when continuous speech exceeds persistence_time.
+
+        Args:
+            is_speech: Whether speech is currently detected.
+            speech_duration: Continuous speech duration from VAD processor (seconds).
+            persistence_time: Seconds of continuous speech before violation.
+
+        Returns: (is_active, is_triggered, message)
+        """
+        if not is_speech:
+            self.speech_start_time = None
+            return False, False, ""
+
+        if self.speech_start_time is None:
+            self.speech_start_time = time.time()
+            return False, False, ""
+
+        elapsed = time.time() - self.speech_start_time
+        if elapsed >= persistence_time:
+            msg = f"Speech detected for {int(elapsed)} seconds."
+            is_triggered = False
+
+            if self.log_violation(msg, violation_type='speech_detected'):
+                is_triggered = True
+
+            return True, is_triggered, msg
+
         return False, False, ""

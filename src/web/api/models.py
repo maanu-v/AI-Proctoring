@@ -62,6 +62,7 @@ class SettingsUpdateRequest(BaseModel):
     enable_identity_verification: Optional[bool] = None
     enable_no_face_warning: Optional[bool] = None
     enable_no_frame_warning: Optional[bool] = None
+    enable_audio_detection: Optional[bool] = None
 
 
 class ConfigUpdateRequest(BaseModel):
