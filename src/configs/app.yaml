@@ -73,15 +73,30 @@ thresholds:
   identity_persistence_time: 2
   # Duration in seconds of continuous speech before triggering a violation.
   speech_persistence_time: 5
+  # Duration in seconds an unknown speaker must persist to trigger a violation.
+  speaker_persistence_time: 2
 
 audio:
   # VAD aggressiveness: 0 (least filtering) to 3 (most aggressive).
-  # Mode 2 is recommended for proctoring — filters ambient noise, catches speech.
-  vad_aggressiveness: 2
+  # Mode 3 is recommended for proctoring — aggressively filters ambient noise like fans/AC.
+  vad_aggressiveness: 3
   # Audio sample rate in Hz. Must be 8000, 16000, 32000, or 48000.
   sample_rate: 16000
   # Frame duration in ms for VAD processing. Must be 10, 20, or 30.
   frame_duration_ms: 20
+  # Minimum RMS energy threshold (0.0-1.0) to consider audio as potential speech.
+  # Audio below this energy level is treated as silence (filters fan/AC noise).
+  # Typical values: 0.01 (sensitive), 0.02 (balanced), 0.04 (strict).
+  energy_threshold: 0.02
+  # Cosine similarity threshold for speaker verification.
+  # Below this value, the speaker is flagged as unknown.
+  speaker_similarity_threshold: 0.75
+  # Seconds of speech audio to buffer before running speaker detection.
+  speaker_buffer_duration: 2.0
+  # Speaker enrollment mode: "auto" (calibrate from first speech) or "explicit" (voice sample at session start).
+  speaker_enrollment_mode: auto
+  # Seconds of speech to collect during auto-calibration before enrollment completes.
+  speaker_calibration_duration: 3.0
 
 # Session management settings
 session:

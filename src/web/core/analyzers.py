@@ -13,6 +13,7 @@ from src.engine.face.blink_estimation import BlinkEstimator
 from src.engine.obj_detection.obj_detect import ObjectDetector
 from src.engine.face.face_embedding import FaceEmbedder
 from src.engine.audio.vad import VADProcessor
+from src.engine.audio.speaker_detector import SpeakerDetector
 from src.utils.config import config
 from src.utils.logger import get_logger
 
@@ -43,6 +44,7 @@ class AnalyzerManager:
         self.object_detector = None
         self.face_embedder = None
         self.vad_processor = None
+        self.speaker_detector = None
         
         self._initialized = True
     
@@ -81,7 +83,18 @@ class AnalyzerManager:
             self.vad_processor = VADProcessor(
                 aggressiveness=config.audio.vad_aggressiveness,
                 sample_rate=config.audio.sample_rate,
-                frame_duration_ms=config.audio.frame_duration_ms
+                frame_duration_ms=config.audio.frame_duration_ms,
+                speech_buffer_duration=config.audio.speaker_buffer_duration,
+                energy_threshold=config.audio.energy_threshold
+            )
+        
+        if self.speaker_detector is None:
+            logger.info("Initializing SpeakerDetector...")
+            self.speaker_detector = SpeakerDetector(
+                similarity_threshold=config.audio.speaker_similarity_threshold,
+                sample_rate=config.audio.sample_rate,
+                enrollment_mode=config.audio.speaker_enrollment_mode,
+                calibration_duration=config.audio.speaker_calibration_duration
             )
         
         logger.info("All analyzers initialized successfully")
@@ -102,7 +115,8 @@ class AnalyzerManager:
             "blink": self.blink_estimator,
             "object": self.object_detector,
             "embedder": self.face_embedder,
-            "vad": self.vad_processor
+            "vad": self.vad_processor,
+            "speaker": self.speaker_detector
         }
     
     def is_initialized(self) -> bool:

@@ -58,7 +58,19 @@ async def get_config():
             "head_pose_persistence_time": config.thresholds.head_pose_persistence_time,
             "gaze_persistence_time": config.thresholds.gaze_persistence_time,
             "identity_check_interval_frames": config.thresholds.identity_check_interval_frames,
-            "identity_persistence_time": config.thresholds.identity_persistence_time
+            "identity_persistence_time": config.thresholds.identity_persistence_time,
+            "speech_persistence_time": config.thresholds.speech_persistence_time,
+            "speaker_persistence_time": config.thresholds.speaker_persistence_time
+        },
+        "audio": {
+            "vad_aggressiveness": config.audio.vad_aggressiveness,
+            "sample_rate": config.audio.sample_rate,
+            "frame_duration_ms": config.audio.frame_duration_ms,
+            "energy_threshold": config.audio.energy_threshold,
+            "speaker_similarity_threshold": config.audio.speaker_similarity_threshold,
+            "speaker_buffer_duration": config.audio.speaker_buffer_duration,
+            "speaker_enrollment_mode": config.audio.speaker_enrollment_mode,
+            "speaker_calibration_duration": config.audio.speaker_calibration_duration
         }
     }
 
@@ -115,6 +127,13 @@ async def update_config(config_update: ConfigUpdateRequest):
                 if hasattr(config.thresholds, key):
                     setattr(config.thresholds, key, value)
                     logger.info(f"Updated thresholds.{key} = {value}")
+        
+        # Update audio config
+        if "audio" in update_data:
+            for key, value in update_data["audio"].items():
+                if hasattr(config.audio, key):
+                    setattr(config.audio, key, value)
+                    logger.info(f"Updated audio.{key} = {value}")
         
         logger.info("Global configuration updated successfully")
         

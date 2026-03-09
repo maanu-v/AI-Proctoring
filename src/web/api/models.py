@@ -63,6 +63,7 @@ class SettingsUpdateRequest(BaseModel):
     enable_no_face_warning: Optional[bool] = None
     enable_no_frame_warning: Optional[bool] = None
     enable_audio_detection: Optional[bool] = None
+    enable_speaker_detection: Optional[bool] = None
 
 
 class ConfigUpdateRequest(BaseModel):
@@ -73,6 +74,7 @@ class ConfigUpdateRequest(BaseModel):
     gaze: Optional[Dict[str, Any]] = None
     blink: Optional[Dict[str, Any]] = None
     thresholds: Optional[Dict[str, Any]] = None
+    audio: Optional[Dict[str, Any]] = None
 
 
 class ViolationsResponse(BaseModel):
@@ -103,3 +105,4 @@ class ConfigResponse(BaseModel):
     gaze: Dict[str, Any]
     blink: Dict[str, Any]
     thresholds: Dict[str, Any]
+    audio: Dict[str, Any]

@@ -13,6 +13,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
 from src.engine.proctor import ViolationTracker
+from src.engine.audio.speaker_detector import SpeakerDetector
 from src.utils.config import config
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,14 @@ class QuizSession:
         self.resume_count = 0  # Track how many times session was resumed
         self.resume_events = []  # Track resume timestamps and inactivity durations
         
+        # Per-session speaker detector (each student has their own voiceprint)
+        self.speaker_detector = SpeakerDetector(
+            similarity_threshold=config.audio.speaker_similarity_threshold,
+            sample_rate=config.audio.sample_rate,
+            enrollment_mode=config.audio.speaker_enrollment_mode,
+            calibration_duration=config.audio.speaker_calibration_duration
+        )
+        
         # Default settings (can be modified per session)
         self.settings = {
             "enable_face_detection": True,
@@ -57,6 +66,7 @@ class QuizSession:
             "enable_no_face_warning": config.thresholds.enable_no_face_warning,
             "enable_no_frame_warning": True,
             "enable_audio_detection": True,
+            "enable_speaker_detection": True,
         }
     
     def to_dict(self) -> Dict:
@@ -95,7 +105,8 @@ class QuizSession:
             'enable_object_detection': 'object',
             'enable_face_detection': 'face',
             'enable_no_face_warning': 'face',
-            'enable_audio_detection': 'audio'
+            'enable_audio_detection': 'audio',
+            'enable_speaker_detection': 'audio'
         }
         
         # Check which features are being disabled

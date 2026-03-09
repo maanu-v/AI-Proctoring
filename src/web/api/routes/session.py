@@ -22,6 +22,7 @@ async def start_session(
     student_id: str = Form(...),
     quiz_id: str = Form(...),
     profile_image: UploadFile = File(None),
+    voice_sample: UploadFile = File(None),
     session_mgr: SessionManager = Depends(get_session_manager),
     analyzer_mgr: AnalyzerManager = Depends(get_analyzer_manager)
 ):
@@ -66,6 +67,14 @@ async def start_session(
         # Set reference embedding if available (only for new sessions)
         if ref_embedding is not None and not is_resumed:
             session.set_reference_embedding(ref_embedding)
+        
+        # Enroll voice sample if provided (explicit enrollment, only for new sessions)
+        if voice_sample and not is_resumed:
+            voice_contents = await voice_sample.read()
+            if session.speaker_detector.enroll(voice_contents):
+                logger.info(f"Voice enrolled for session {session_id} (explicit mode)")
+            else:
+                logger.warning(f"Voice enrollment failed for session {session_id}")
         
         if is_resumed:
             logger.warning(f"Resumed session {session_id} for student {student_id}, quiz {quiz_id} (Resume #{session.resume_count})")

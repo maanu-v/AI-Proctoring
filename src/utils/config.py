@@ -34,6 +34,7 @@ class ThresholdsConfig:
     identity_check_interval_frames: int = 30
     identity_persistence_time: float = 2.0
     speech_persistence_time: float = 5.0
+    speaker_persistence_time: float = 2.0
 
 @dataclass
 class BlinkConfig:
@@ -64,6 +65,11 @@ class AudioConfig:
     vad_aggressiveness: int = 2
     sample_rate: int = 16000
     frame_duration_ms: int = 20
+    energy_threshold: float = 0.02
+    speaker_similarity_threshold: float = 0.75
+    speaker_buffer_duration: float = 2.0
+    speaker_enrollment_mode: str = "auto"
+    speaker_calibration_duration: float = 3.0
 
 class Config:
     def __init__(self, config_path: str = "src/configs/app.yaml"):

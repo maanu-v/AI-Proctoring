@@ -19,4 +19,5 @@ dependencies = [
     "pydantic>=2.6.0",
     "webrtcvad>=2.0.10",
     "setuptools<82",
+    "resemblyzer>=0.1.4",
 ]

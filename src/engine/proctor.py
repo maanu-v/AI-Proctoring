@@ -16,6 +16,7 @@ class ViolationTracker:
         self.person_body_start_time = None
         self.identity_start_time = None
         self.speech_start_time = None
+        self.unknown_speaker_start_time = None
 
     def reset(self):
         self.violations = []
@@ -31,6 +32,7 @@ class ViolationTracker:
         self.person_body_start_time = None
         self.identity_start_time = None
         self.speech_start_time = None
+        self.unknown_speaker_start_time = None
     
     def clear_feature_state(self, feature_name):
         """
@@ -55,6 +57,7 @@ class ViolationTracker:
             self.face_count_start_time = None
         elif feature_name == 'audio':
             self.speech_start_time = None
+            self.unknown_speaker_start_time = None
 
     def check_face_count(self, face_count, max_faces, persistence_time=0):
         if face_count > max_faces:
@@ -445,6 +448,38 @@ class ViolationTracker:
             is_triggered = False
 
             if self.log_violation(msg, violation_type='speech_detected'):
+                is_triggered = True
+
+            return True, is_triggered, msg
+
+        return False, False, ""
+
+    def check_speaker_violation(self, unknown_speaker_detected, similarity, persistence_time=2.0):
+        """
+        Check for unknown speaker violation.
+        Triggers when a voice not matching the reference is detected for persistence_time.
+
+        Args:
+            unknown_speaker_detected: Whether current speaker doesn't match reference.
+            similarity: Cosine similarity score to reference voiceprint.
+            persistence_time: Seconds before violation triggers.
+
+        Returns: (is_active, is_triggered, message)
+        """
+        if not unknown_speaker_detected:
+            self.unknown_speaker_start_time = None
+            return False, False, ""
+
+        if self.unknown_speaker_start_time is None:
+            self.unknown_speaker_start_time = time.time()
+            return False, False, ""
+
+        elapsed = time.time() - self.unknown_speaker_start_time
+        if elapsed >= persistence_time:
+            msg = f"Unknown speaker detected (similarity: {similarity:.2f}) for {int(elapsed)} seconds."
+            is_triggered = False
+
+            if self.log_violation(msg, violation_type='unknown_speaker'):
                 is_triggered = True
 
             return True, is_triggered, msg

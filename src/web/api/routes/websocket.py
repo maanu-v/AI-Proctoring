@@ -404,6 +404,7 @@ async def websocket_endpoint(
                             "speech_segments": vad_result["speech_segments"],
                             "frames_with_speech": vad_result["frames_with_speech"],
                             "total_frames": vad_result["total_frames"],
+                            "speech_buffer_ready": vad_result["speech_buffer_ready"],
                         }
 
                         # Check speech violation
@@ -421,6 +422,40 @@ async def websocket_endpoint(
                                     "message": speech_msg,
                                     "timestamp": datetime.now().isoformat()
                                 })
+
+                        # ============================================================
+                        # Speaker Detection (runs when speech buffer is ready)
+                        # ============================================================
+                        if session.settings.get("enable_speaker_detection", True) and vad_result["is_speech"]:
+                            speaker_result = {}
+
+                            if vad_result["speech_buffer_ready"]:
+                                # Get buffered speech audio and run speaker detection
+                                speech_buffer = analyzers["vad"].get_speech_buffer()
+                                speaker_result = session.speaker_detector.process(speech_buffer)
+
+                                audio_result["speaker"] = speaker_result
+
+                                # Check speaker violation (only after calibration)
+                                if speaker_result.get("is_calibrated", False) and speaker_result.get("unknown_speaker_detected", False):
+                                    spk_active, spk_triggered, spk_msg = session.violation_tracker.check_speaker_violation(
+                                        speaker_result["unknown_speaker_detected"],
+                                        speaker_result["similarity"],
+                                        persistence_time=config.thresholds.speaker_persistence_time
+                                    )
+
+                                    if spk_active:
+                                        warnings.append(spk_msg)
+                                        if spk_triggered:
+                                            violations.append({
+                                                "type": "unknown_speaker",
+                                                "message": spk_msg,
+                                                "timestamp": datetime.now().isoformat()
+                                            })
+                            elif not session.speaker_detector.is_calibrated:
+                                # Auto-calibration: feed audio even before buffer is full
+                                speaker_result = session.speaker_detector.process(audio_bytes)
+                                audio_result["speaker"] = speaker_result
 
                     response = {
                         "type": "audio_analysis",

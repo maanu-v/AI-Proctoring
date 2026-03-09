@@ -491,6 +491,33 @@
                         </div>
                     </div>
 
+                    <!-- Audio Analysis Stats -->
+                    <h3>🎤 Audio Analysis</h3>
+                    <div class="stats">
+                        <div class="stat-card">
+                            <div class="stat-value" id="vadStatus">-</div>
+                            <div class="stat-label">Voice Activity</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="speechDuration">0s</div>
+                            <div class="stat-label">Speech Duration</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="speechSegments">0</div>
+                            <div class="stat-label">Speech Segments</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="speakerStatus">-</div>
+                            <div class="stat-label">Speaker</div>
+                        </div>
+                    </div>
+
+                    <div id="speakerDetails" class="session-info" style="display: none;">
+                        <p><strong>Calibrated:</strong> <span id="speakerCalibrated">No</span></p>
+                        <p><strong>Calibration Progress:</strong> <span id="speakerCalibProgress">0%</span></p>
+                        <p><strong>Similarity:</strong> <span id="speakerSimilarity">-</span></p>
+                    </div>
+
                     <h3>Latest Analysis</h3>
                     <div id="analysisResults" class="results scrollable">
                         <p style="color: #999; text-align: center;">Start analysis to see results</p>
@@ -557,6 +584,20 @@
                         <label>Identity Verification</label>
                         <label class="switch">
                             <input type="checkbox" id="settingIdentity" onchange="updateSettings()" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-item">
+                        <label>Audio Detection (VAD)</label>
+                        <label class="switch">
+                            <input type="checkbox" id="settingAudio" onchange="updateSettings()" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-item">
+                        <label>Speaker Detection</label>
+                        <label class="switch">
+                            <input type="checkbox" id="settingSpeaker" onchange="updateSettings()" checked>
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -661,6 +702,25 @@
                     </div>
                 </div>
 
+                <h3>Audio & Speaker Detection</h3>
+                <div class="config-grid">
+                    <div class="form-group"><label>VAD Aggressiveness (0-3)</label><input type="number" id="audioVadAggr" value="3" min="0" max="3" step="1"></div>
+                    <div class="form-group"><label>Energy Threshold (0-1)</label><input type="number" id="audioEnergyThresh" value="0.02" step="0.005" min="0" max="1"></div>
+                    <div class="form-group"><label>Sample Rate (Hz)</label><input type="number" id="audioSampleRate" value="16000" step="8000"></div>
+                    <div class="form-group"><label>Speech Persistence (sec)</label><input type="number" id="thrSpeechPers" value="5" step="1"></div>
+                    <div class="form-group"><label>Speaker Persistence (sec)</label><input type="number" id="thrSpeakerPers" value="2" step="1"></div>
+                    <div class="form-group"><label>Speaker Similarity Threshold</label><input type="number" id="audioSpeakerThreshold" value="0.75" step="0.05" min="0" max="1"></div>
+                    <div class="form-group"><label>Speaker Buffer Duration (sec)</label><input type="number" id="audioSpeakerBuffer" value="2.0" step="0.5"></div>
+                    <div class="form-group"><label>Speaker Calibration Duration (sec)</label><input type="number" id="audioSpeakerCalib" value="3.0" step="0.5"></div>
+                    <div class="form-group">
+                        <label>Speaker Enrollment Mode</label>
+                        <select id="audioEnrollMode" style="width:100%;padding:12px;border:2px solid #e0e0e0;border-radius:8px;font-size:1em;">
+                            <option value="auto">Auto (calibrate from first speech)</option>
+                            <option value="explicit">Explicit (voice sample at start)</option>
+                        </select>
+                    </div>
+                </div>
+
                 <button class="btn-success" onclick="updateConfig()" style="margin-top: 15px;">Update
                     Configuration</button>
             </div>
@@ -683,6 +743,12 @@
         let frameCount = 0;
         let fps = 0;
         let lastFrameTime = Date.now();
+
+        // Audio state
+        let audioContext = null;
+        let audioStream = null;
+        let audioProcessor = null;
+        let audioSource = null;
 
         // Session Management
         async function createSession() {
@@ -776,10 +842,12 @@
                 video.srcObject = null;
                 btn.textContent = 'Start Camera';
                 btn.classList.remove('btn-danger');
+                stopAudioCapture();
             } else {
                 try {
                     cameraStream = await navigator.mediaDevices.getUserMedia({
-                        video: { width: 1280, height: 720 }
+                        video: { width: 1280, height: 720 },
+                        audio: true
                     });
                     video.srcObject = cameraStream;
                     btn.textContent = 'Stop Camera';
@@ -848,6 +916,9 @@
                     wsStatus.className = 'status success';
                     wsStatus.textContent = '🔌 WebSocket: Connected ✓';
 
+                    // Start audio capture and streaming
+                    startAudioCapture();
+
                     // Wait for video to be ready before starting frame capture
                     const video = document.getElementById('video');
                     const startFrameCapture = () => {
@@ -882,6 +953,11 @@
                         updateAnalysisResults(message.data);
                         updateViolations(message.data.violations);
                         updateStats();
+                    } else if (message.type === 'audio_analysis') {
+                        updateAudioResults(message.data);
+                        if (message.data.violations && message.data.violations.length > 0) {
+                            updateViolations(message.data.violations);
+                        }
                     } else if (message.type === 'error') {
                         console.error('WebSocket error:', message.message);
                         document.getElementById('sessionStatus').className = 'status error';
@@ -1182,7 +1258,9 @@
                 enable_gaze: document.getElementById('settingGaze').checked,
                 enable_blink: document.getElementById('settingBlink').checked,
                 enable_object_detection: document.getElementById('settingObject').checked,
-                enable_identity_verification: document.getElementById('settingIdentity').checked
+                enable_identity_verification: document.getElementById('settingIdentity').checked,
+                enable_audio_detection: document.getElementById('settingAudio').checked,
+                enable_speaker_detection: document.getElementById('settingSpeaker').checked
             };
 
             try {
@@ -1240,6 +1318,15 @@
                     calibration_duration: parseFloat(document.getElementById('blinkCalibDur').value) || 5.0,
                     calibration_ratio: parseFloat(document.getElementById('blinkCalibRat').value) || 0.75
                 },
+                audio: {
+                    vad_aggressiveness: parseInt(document.getElementById('audioVadAggr').value) || 2,
+                    sample_rate: parseInt(document.getElementById('audioSampleRate').value) || 16000,
+                    energy_threshold: parseFloat(document.getElementById('audioEnergyThresh').value) || 0.02,
+                    speaker_similarity_threshold: parseFloat(document.getElementById('audioSpeakerThreshold').value) || 0.75,
+                    speaker_buffer_duration: parseFloat(document.getElementById('audioSpeakerBuffer').value) || 2.0,
+                    speaker_calibration_duration: parseFloat(document.getElementById('audioSpeakerCalib').value) || 3.0,
+                    speaker_enrollment_mode: document.getElementById('audioEnrollMode').value
+                },
                 thresholds: {
                     max_num_faces: parseInt(document.getElementById('thrMaxFaces').value) || 1,
                     enable_no_face_warning: document.getElementById('thrNoFaceWarn').checked,
@@ -1249,7 +1336,9 @@
                     gaze_persistence_time: parseFloat(document.getElementById('thrGazePers').value) || 2,
                     no_frame_persistence_time: parseFloat(document.getElementById('thrNoFramePers').value) || 10,
                     identity_check_interval_frames: parseInt(document.getElementById('thrIdentInterval').value) || 30,
-                    identity_persistence_time: parseFloat(document.getElementById('thrIdentPers').value) || 2
+                    identity_persistence_time: parseFloat(document.getElementById('thrIdentPers').value) || 2,
+                    speech_persistence_time: parseFloat(document.getElementById('thrSpeechPers').value) || 5,
+                    speaker_persistence_time: parseFloat(document.getElementById('thrSpeakerPers').value) || 2
                 }
             };
 
@@ -1337,12 +1426,148 @@
                     document.getElementById('thrNoFramePers').value = config.thresholds.no_frame_persistence_time ?? 10;
                     document.getElementById('thrIdentInterval').value = config.thresholds.identity_check_interval_frames ?? 30;
                     document.getElementById('thrIdentPers').value = config.thresholds.identity_persistence_time ?? 2;
+                    document.getElementById('thrSpeechPers').value = config.thresholds.speech_persistence_time ?? 5;
+                    document.getElementById('thrSpeakerPers').value = config.thresholds.speaker_persistence_time ?? 2;
                     if (config.thresholds.enable_no_face_warning !== undefined) {
                         document.getElementById('thrNoFaceWarn').checked = config.thresholds.enable_no_face_warning;
                     }
                 }
+                if (config.audio) {
+                    document.getElementById('audioVadAggr').value = config.audio.vad_aggressiveness ?? 3;
+                    document.getElementById('audioEnergyThresh').value = config.audio.energy_threshold ?? 0.02;
+                    document.getElementById('audioSampleRate').value = config.audio.sample_rate ?? 16000;
+                    document.getElementById('audioSpeakerThreshold').value = config.audio.speaker_similarity_threshold ?? 0.75;
+                    document.getElementById('audioSpeakerBuffer').value = config.audio.speaker_buffer_duration ?? 2.0;
+                    document.getElementById('audioSpeakerCalib').value = config.audio.speaker_calibration_duration ?? 3.0;
+                    document.getElementById('audioEnrollMode').value = config.audio.speaker_enrollment_mode ?? 'auto';
+                }
             } catch (error) {
                 console.error('Error loading config:', error);
+            }
+        }
+
+        // =============================================
+        // Audio Capture & Streaming
+        // =============================================
+        function startAudioCapture() {
+            if (!cameraStream) return;
+
+            // Check if audio tracks are available
+            const audioTracks = cameraStream.getAudioTracks();
+            if (audioTracks.length === 0) {
+                console.warn('No audio track available');
+                return;
+            }
+
+            try {
+                audioContext = new AudioContext({ sampleRate: 16000 });
+                audioSource = audioContext.createMediaStreamSource(cameraStream);
+
+                // ScriptProcessorNode with 4096 buffer size
+                audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+
+                audioProcessor.onaudioprocess = (e) => {
+                    if (!wsConnection || wsConnection.readyState !== WebSocket.OPEN) return;
+                    if (!isAnalyzing) return;
+
+                    const float32 = e.inputBuffer.getChannelData(0);
+
+                    // Convert float32 [-1, 1] to int16 PCM
+                    const int16 = new Int16Array(float32.length);
+                    for (let i = 0; i < float32.length; i++) {
+                        const s = Math.max(-1, Math.min(1, float32[i]));
+                        int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                    }
+
+                    // Convert to base64
+                    const uint8 = new Uint8Array(int16.buffer);
+                    let binary = '';
+                    for (let i = 0; i < uint8.length; i++) {
+                        binary += String.fromCharCode(uint8[i]);
+                    }
+                    const audioBase64 = btoa(binary);
+
+                    wsConnection.send(JSON.stringify({
+                        type: 'audio',
+                        audio_base64: audioBase64
+                    }));
+                };
+
+                audioSource.connect(audioProcessor);
+                audioProcessor.connect(audioContext.destination);
+
+                console.log('Audio capture started (16kHz, mono, PCM)');
+            } catch (error) {
+                console.error('Error starting audio capture:', error);
+            }
+        }
+
+        function stopAudioCapture() {
+            if (audioProcessor) {
+                audioProcessor.disconnect();
+                audioProcessor = null;
+            }
+            if (audioSource) {
+                audioSource.disconnect();
+                audioSource = null;
+            }
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+            console.log('Audio capture stopped');
+        }
+
+        function updateAudioResults(data) {
+            const audio = data.audio || {};
+
+            // Update VAD status
+            const vadEl = document.getElementById('vadStatus');
+            if (audio.is_speech) {
+                vadEl.textContent = '🔴';
+                vadEl.style.color = '#d32f2f';
+            } else {
+                vadEl.textContent = '⚪';
+                vadEl.style.color = '#388e3c';
+            }
+
+            // Speech duration
+            document.getElementById('speechDuration').textContent =
+                (audio.speech_duration || 0).toFixed(1) + 's';
+
+            // Speech segments
+            document.getElementById('speechSegments').textContent =
+                audio.speech_segments || 0;
+
+            // Speaker detection
+            const speaker = audio.speaker;
+            const speakerEl = document.getElementById('speakerStatus');
+            const detailsEl = document.getElementById('speakerDetails');
+
+            if (speaker) {
+                detailsEl.style.display = 'block';
+                document.getElementById('speakerCalibrated').textContent =
+                    speaker.is_calibrated ? 'Yes ✓' : 'No';
+                document.getElementById('speakerCalibProgress').textContent =
+                    Math.round((speaker.calibration_progress || 0) * 100) + '%';
+                document.getElementById('speakerSimilarity').textContent =
+                    speaker.similarity >= 0 ? speaker.similarity.toFixed(4) : '-';
+
+                if (!speaker.is_calibrated) {
+                    speakerEl.textContent = '⏳';
+                    speakerEl.style.color = '#f57c00';
+                } else if (speaker.unknown_speaker_detected) {
+                    speakerEl.textContent = '⚠️';
+                    speakerEl.style.color = '#d32f2f';
+                } else {
+                    speakerEl.textContent = '✓';
+                    speakerEl.style.color = '#388e3c';
+                }
+            }
+
+            // Show warnings
+            if (data.warnings && data.warnings.length > 0) {
+                data.warnings.forEach(w => console.warn('Audio warning:', w));
             }
         }
 
@@ -1365,6 +1590,7 @@
                 clearInterval(violationsInterval);
                 clearInterval(pingInterval);
             }
+            stopAudioCapture();
             if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
                 wsConnection.close();
             }
